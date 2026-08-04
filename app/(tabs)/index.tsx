@@ -98,7 +98,7 @@ export default function HomeScreen() {
   const promptIndex = useMemo(() => {
     const start = new Date(today.getFullYear(), 0, 0).getTime();
     const dayOfYear = Math.floor((today.getTime() - start) / DAY_MS);
-    return (dayOfYear % 6) + 1;
+    return (dayOfYear % 30) + 1;
   }, [today]);
 
   // Dominant feeling today for the hero accent.
