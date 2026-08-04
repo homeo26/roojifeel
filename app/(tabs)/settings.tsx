@@ -29,6 +29,7 @@ import {
   requestNotificationPermission,
 } from '../../src/notifications';
 import { exportHistory, importHistory } from '../../src/exportImport';
+import { disableBackup, enableBackup, getBackupStatus } from '../../src/backup';
 
 const layoutT = () => LinearTransition.duration(theme.motion.fast);
 
@@ -41,6 +42,27 @@ export default function SettingsScreen() {
   const [pendingTime, setPendingTime] = useState<Date>(new Date(2024, 0, 1, 20, 0));
   const [busy, setBusy] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(haptics.hapticsEnabled());
+  const [backupOn, setBackupOn] = useState(false);
+  const [lastBackup, setLastBackup] = useState<number | null>(null);
+
+  useEffect(() => {
+    getBackupStatus().then((st) => {
+      setBackupOn(st.enabled);
+      setLastBackup(st.lastBackupAt);
+    });
+  }, []);
+
+  const toggleBackup = async (value: boolean) => {
+    haptics.selection();
+    if (value) {
+      const ok = await enableBackup();
+      setBackupOn(ok);
+      if (ok) getBackupStatus().then((st) => setLastBackup(st.lastBackupAt));
+    } else {
+      await disableBackup();
+      setBackupOn(false);
+    }
+  };
 
   const toggleHaptics = async (value: boolean) => {
     setHapticsOn(value);
@@ -283,6 +305,34 @@ export default function SettingsScreen() {
             </View>
           </View>
         </Pressable>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Ionicons name="cloud-upload-outline" size={24} color={theme.colors.accent} />
+            <View style={styles.rowText}>
+              <Text style={[styles.rowTitle, { fontFamily: font(lang, 'bold') }]}>
+                {t('settings.autoBackup')}
+              </Text>
+              <Text style={[styles.rowDesc, { fontFamily: font(lang, 'regular') }]}>
+                {lastBackup != null
+                  ? t('settings.autoBackupLast', {
+                      date: new Date(lastBackup).toLocaleString(lang === 'ar' ? 'ar' : 'en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                    })
+                  : t('settings.autoBackupDesc')}
+              </Text>
+            </View>
+            <Switch
+              value={backupOn}
+              onValueChange={toggleBackup}
+              trackColor={{ true: theme.colors.purple, false: theme.colors.border }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
         <Pressable style={styles.card} onPress={onImport} disabled={busy}>
           <View style={styles.row}>
             <Ionicons name="download-outline" size={24} color={theme.colors.accent} />

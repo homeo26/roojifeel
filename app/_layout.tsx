@@ -19,6 +19,7 @@ import { initI18n, loadSavedLanguage } from '../src/i18n';
 import { loadHapticsPref } from '../src/haptics';
 import i18next from 'i18next';
 import { syncSmartReminders } from '../src/notifications';
+import { runBackup } from '../src/backup';
 import { theme } from '../src/theme';
 
 export default function RootLayout() {
@@ -45,6 +46,7 @@ export default function RootLayout() {
         nudgeTitle: i18next.t('settings.nudgeTitle'),
         nudgeBody: i18next.t('settings.nudgeBody'),
       }).catch(() => {});
+      runBackup().catch(() => {});
       // Keep the NATIVE direction pinned to LTR on both platforms.
       // RTL is applied deterministically in JS via per-screen `direction`
       // styles and the custom tab bar, so iOS and Android behave the same

@@ -19,7 +19,9 @@
       "bundleIdentifier": "com.roojifeel.app",
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
-        "ExpoLocalization_supportsRTL": true
+        "ExpoLocalization_supportsRTL": true,
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
       }
     },
     "android": {
