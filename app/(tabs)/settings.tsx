@@ -18,7 +18,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { useTranslation } from 'react-i18next';
 import * as haptics from '../../src/haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { theme, font } from '../../src/theme';
 import { Pressy } from '../../src/components/Pressy';
 import { saveLanguage } from '../../src/i18n';
@@ -211,7 +211,12 @@ export default function SettingsScreen() {
           </Pressy>
 
           {showTimePicker ? (
-            <View style={styles.pickerWrap}>
+            <Animated.View
+              entering={FadeInDown.duration(220).springify().damping(18)}
+              exiting={FadeOut.duration(120)}
+              layout={layoutT()}
+              style={styles.pickerWrap}
+            >
               <DateTimePicker
                 value={Platform.OS === 'ios' ? pendingTime : new Date(2024, 0, 1, 20, 0)}
                 mode="time"
@@ -234,7 +239,7 @@ export default function SettingsScreen() {
                   </Pressy>
                 </View>
               ) : null}
-            </View>
+            </Animated.View>
           ) : null}
         </Animated.View>
 
