@@ -1,11 +1,12 @@
 /**
- * Log flow — three steps through the feelings wheel (core → secondary → tertiary),
- * with a connected path trail showing exactly where you've been,
- * then an optional note, saved with the exact date and minute.
+ * Log flow v2 — three steps through the feelings wheel per feeling, with
+ * support for MULTIPLE feelings per check-in, then a details step:
+ * intensity slider, tags, photo, voice memo, and an optional note.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,6 +23,15 @@ import * as haptics from '../src/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Slider from '@react-native-community/slider';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  AudioModule,
+  RecordingPresets,
+  useAudioPlayer,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
 import {
   CoreFeeling,
   FEELINGS_WHEEL,
@@ -31,7 +41,8 @@ import {
   getTertiary,
   label,
 } from '../src/data/feelings';
-import { addEntry, deleteEntry, getEntry, updateEntry } from '../src/db';
+import { FeelingPath, addEntry, deleteEntry, getAllTags, getEntry, updateEntry } from '../src/db';
+import { deleteAttachment, isPersisted, persistAttachment } from '../src/attachments';
 import { theme, font } from '../src/theme';
 
 type Step = 0 | 1 | 2 | 3;
@@ -48,14 +59,49 @@ export default function LogScreen() {
   const editingId = editId ? Number(editId) : null;
 
   const [step, setStep] = useState<Step>(0);
+  // Wheel selection in progress:
   const [core, setCore] = useState<CoreFeeling | null>(null);
   const [secondary, setSecondary] = useState<FeelingNode | null>(null);
-  const [tertiary, setTertiary] = useState<FeelingNode | null>(null);
+  // Accumulated feelings for this check-in:
+  const [feelings, setFeelings] = useState<FeelingPath[]>([]);
+  const [intensity, setIntensity] = useState(3);
+  const [intensityTouched, setIntensityTouched] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [audioUri, setAudioUri] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Quick-log: a core was chosen on the home screen — skip straight to
-  // the branch step with that core preselected.
+  // Voice memo recording/playback.
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+  const player = useAudioPlayer(audioUri ?? undefined);
+
+  useEffect(() => {
+    getAllTags().then(setTagSuggestions);
+  }, []);
+
+  // Edit mode: prefill from the existing entry and jump to details.
+  useEffect(() => {
+    if (editingId == null) return;
+    getEntry(editingId).then((entry) => {
+      if (!entry) return;
+      setFeelings(entry.feelings);
+      setNote(entry.note ?? '');
+      setTags(entry.tags);
+      setPhotoUri(entry.photoUri);
+      setAudioUri(entry.audioUri);
+      if (entry.intensity != null) {
+        setIntensity(entry.intensity);
+        setIntensityTouched(true);
+      }
+      setStep(3);
+    });
+  }, [editingId]);
+
+  // Quick-log: a core was chosen on the home screen.
   useEffect(() => {
     if (editingId != null || !coreId) return;
     const c = getCore(coreId);
@@ -65,23 +111,13 @@ export default function LogScreen() {
     }
   }, [coreId, editingId]);
 
-  // Edit mode: prefill from the existing entry and jump to the note step.
-  // The user can walk back through the steps to change the feeling path.
-  useEffect(() => {
-    if (editingId == null) return;
-    getEntry(editingId).then((entry) => {
-      if (!entry) return;
-      const c = getCore(entry.coreId) ?? null;
-      setCore(c);
-      setSecondary(getSecondary(entry.coreId, entry.secondaryId) ?? null);
-      setTertiary(getTertiary(entry.coreId, entry.secondaryId, entry.tertiaryId) ?? null);
-      setNote(entry.note ?? '');
-      setStep(3);
-    });
-  }, [editingId]);
-
-  const stepTitle = [t('log.stepCore'), t('log.stepSecondary'), t('log.stepTertiary'), t('log.noteTitle')][step];
-  const accent = core?.color ?? theme.colors.purple;
+  const stepTitle = [
+    feelings.length > 0 ? t('log.stepCoreAnother') : t('log.stepCore'),
+    t('log.stepSecondary'),
+    t('log.stepTertiary'),
+    t('log.detailsTitle'),
+  ][step];
+  const accent = core?.color ?? getCore(feelings[0]?.coreId)?.color ?? theme.colors.purple;
 
   const options: FeelingNode[] = useMemo(() => {
     if (step === 0) return FEELINGS_WHEEL;
@@ -90,19 +126,24 @@ export default function LogScreen() {
     return [];
   }, [step, core, secondary]);
 
-  const pick = (nodeIndex: number) => {
+  const pick = (index: number) => {
     haptics.selection();
     if (step === 0) {
-      setCore(FEELINGS_WHEEL[nodeIndex]);
+      setCore(FEELINGS_WHEEL[index]);
       setSecondary(null);
-      setTertiary(null);
       setStep(1);
     } else if (step === 1) {
-      setSecondary(options[nodeIndex]);
-      setTertiary(null);
+      setSecondary(options[index]);
       setStep(2);
-    } else if (step === 2) {
-      setTertiary(options[nodeIndex]);
+    } else if (step === 2 && core && secondary) {
+      const path: FeelingPath = {
+        coreId: core.id,
+        secondaryId: secondary.id,
+        tertiaryId: options[index].id,
+      };
+      setFeelings((prev) => [...prev, path]);
+      setCore(null);
+      setSecondary(null);
       setStep(3);
     }
   };
@@ -110,23 +151,68 @@ export default function LogScreen() {
   const goBack = () => {
     haptics.selection();
     if (step === 0) {
+      if (feelings.length > 0) setStep(3);
+      else router.back();
+    } else if (step === 3) {
       router.back();
     } else {
       if (step === 1) setCore(null);
       if (step === 2) setSecondary(null);
-      if (step === 3) setTertiary(null);
       setStep((step - 1) as Step);
     }
   };
 
+  const removeFeeling = (index: number) => {
+    haptics.selection();
+    setFeelings((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addTag = (raw: string) => {
+    const tag = raw.trim().replace(/^#/, '');
+    if (!tag) return;
+    haptics.selection();
+    setTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+    setTagInput('');
+  };
+
+  const pickPhoto = async () => {
+    haptics.selection();
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (!res.canceled && res.assets[0]) setPhotoUri(res.assets[0].uri);
+  };
+
+  const toggleRecording = async () => {
+    haptics.selection();
+    if (recorderState.isRecording) {
+      await recorder.stop();
+      if (recorder.uri) setAudioUri(recorder.uri);
+      return;
+    }
+    const perm = await AudioModule.requestRecordingPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(t('log.micDenied'));
+      return;
+    }
+    await recorder.prepareToRecordAsync();
+    recorder.record();
+  };
+
   const save = async () => {
-    if (!core || !secondary || !tertiary || saving) return;
+    if (feelings.length === 0 || saving) return;
     setSaving(true);
+    // Move fresh attachments into permanent storage.
+    const finalPhoto = photoUri && !isPersisted(photoUri) ? persistAttachment(photoUri, 'photo') : photoUri;
+    const finalAudio = audioUri && !isPersisted(audioUri) ? persistAttachment(audioUri, 'audio') : audioUri;
     const payload = {
-      coreId: core.id,
-      secondaryId: secondary.id,
-      tertiaryId: tertiary.id,
+      feelings,
       note: note.trim() === '' ? null : note.trim(),
+      intensity: intensityTouched ? intensity : null,
+      tags,
+      photoUri: finalPhoto,
+      audioUri: finalAudio,
     };
     if (editingId != null) {
       await updateEntry(editingId, payload);
@@ -146,7 +232,10 @@ export default function LogScreen() {
         text: t('history.delete'),
         style: 'destructive',
         onPress: async () => {
+          const entry = await getEntry(editingId);
           await deleteEntry(editingId);
+          deleteAttachment(entry?.photoUri ?? null);
+          deleteAttachment(entry?.audioUri ?? null);
           haptics.success();
           router.back();
         },
@@ -154,14 +243,24 @@ export default function LogScreen() {
     ]);
   };
 
-  /** The traversal trail: [core, secondary, tertiary] as far as chosen. */
+  /** Wheel trail while picking. */
   const trail: Array<{ node: FeelingNode; ring: string }> = [];
   if (core) trail.push({ node: core, ring: t('log.ringCore') });
   if (secondary) trail.push({ node: secondary, ring: t('log.ringSecondary') });
-  if (tertiary) trail.push({ node: tertiary, ring: t('log.ringTertiary') });
+
+  const intensityLabels = [
+    t('log.intensity1'),
+    t('log.intensity2'),
+    t('log.intensity3'),
+    t('log.intensity4'),
+    t('log.intensity5'),
+  ];
 
   return (
-    <SafeAreaView style={[styles.safe, { direction: lang === 'ar' ? 'rtl' : 'ltr' }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.safe, { direction: lang === 'ar' ? 'rtl' : 'ltr' }]}
+      edges={['top', 'bottom']}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -170,13 +269,12 @@ export default function LogScreen() {
         <View style={styles.header}>
           <Pressable onPress={goBack} hitSlop={12} style={styles.backBtn}>
             <Ionicons
-              name={step === 0 ? 'close' : 'chevron-back'}
+              name={step === 0 && feelings.length === 0 ? 'close' : step === 3 ? 'close' : 'chevron-back'}
               size={24}
               color={theme.colors.ink}
-              style={{ transform: [{ scaleX: lang === 'ar' && step !== 0 ? -1 : 1 }] }}
+              style={{ transform: [{ scaleX: lang === 'ar' && step !== 3 && step !== 0 ? -1 : 1 }] }}
             />
           </Pressable>
-          {/* Segmented progress */}
           <View style={styles.segments}>
             {[0, 1, 2, 3].map((i) => (
               <View
@@ -191,21 +289,16 @@ export default function LogScreen() {
           <View style={styles.backBtn} />
         </View>
 
-        {/* Path trail */}
-        {trail.length > 0 ? (
+        {/* Wheel trail while picking */}
+        {step < 3 && trail.length > 0 ? (
           <Animated.View layout={layoutT()} style={styles.trail}>
             {trail.map((item, i) => (
               <Animated.View key={item.node.id} entering={fadeIn()} style={styles.trailItem}>
-                {i > 0 ? (
-                  <View style={[styles.trailConnector, { backgroundColor: accent }]} />
-                ) : null}
+                {i > 0 ? <View style={[styles.trailConnector, { backgroundColor: accent }]} /> : null}
                 <View
                   style={[
                     styles.trailChip,
-                    {
-                      borderColor: accent,
-                      backgroundColor: core?.tint ?? theme.colors.surface,
-                    },
+                    { borderColor: accent, backgroundColor: core?.tint ?? theme.colors.surface },
                   ]}
                 >
                   <Text style={[styles.trailRing, { fontFamily: font(lang, 'semibold') }]}>
@@ -243,21 +336,16 @@ export default function LogScreen() {
             showsVerticalScrollIndicator={false}
           >
             {options.map((node, index) => {
-              const bg =
-                step === 0
-                  ? (node as CoreFeeling).tint
-                  : core?.tint ?? theme.colors.surface;
-              const border =
-                step === 0 ? (node as CoreFeeling).color : core?.color ?? theme.colors.border;
-              const fg =
-                step === 0 ? (node as CoreFeeling).colorMid : core?.colorMid ?? theme.colors.ink;
+              const bg = step === 0 ? (node as CoreFeeling).tint : core?.tint ?? theme.colors.surface;
+              const border = step === 0 ? (node as CoreFeeling).color : core?.color ?? theme.colors.border;
+              const fg = step === 0 ? (node as CoreFeeling).colorMid : core?.colorMid ?? theme.colors.ink;
               return (
                 <Pressable
                   key={node.id}
                   style={({ pressed }) => [
                     styles.option,
                     { backgroundColor: bg, borderColor: pressed ? border : theme.colors.border },
-                    pressed && styles.optionPressed,
+                    pressed && styles.pressed,
                   ]}
                   onPress={() => pick(index)}
                 >
@@ -280,12 +368,210 @@ export default function LogScreen() {
             })}
           </Animated.ScrollView>
         ) : (
-          <Animated.View entering={fadeIn()} style={styles.noteWrap}>
+          <Animated.ScrollView
+            entering={fadeIn()}
+            contentContainerStyle={styles.details}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Chosen feelings */}
+            <View style={styles.feelingsWrap}>
+              {feelings.map((f, i) => {
+                const c = getCore(f.coreId);
+                const tert = getTertiary(f.coreId, f.secondaryId, f.tertiaryId);
+                const sec = getSecondary(f.coreId, f.secondaryId);
+                if (!c) return null;
+                return (
+                  <Animated.View
+                    key={`${f.coreId}-${f.tertiaryId}-${i}`}
+                    entering={fadeIn()}
+                    layout={layoutT()}
+                    style={[styles.feelingChip, { backgroundColor: c.tint, borderColor: c.color }]}
+                  >
+                    <Text style={styles.feelingChipEmoji}>{c.emoji}</Text>
+                    <View>
+                      <Text style={[styles.feelingChipPath, { fontFamily: font(lang, 'semibold') }]}>
+                        {label(c, lang)} › {label(sec, lang)}
+                      </Text>
+                      <Text style={[styles.feelingChipLeaf, { fontFamily: font(lang, 'bold'), color: c.colorMid }]}>
+                        {label(tert, lang)}
+                      </Text>
+                    </View>
+                    <Pressable hitSlop={8} onPress={() => removeFeeling(i)}>
+                      <Ionicons name="close-circle" size={18} color={theme.colors.inkFaint} />
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+              <Pressable
+                style={({ pressed }) => [styles.addFeelingChip, pressed && styles.pressed]}
+                onPress={() => {
+                  haptics.selection();
+                  setStep(0);
+                }}
+              >
+                <Ionicons name="add" size={16} color={theme.colors.purpleSoft} />
+                <Text style={[styles.addFeelingText, { fontFamily: font(lang, 'bold') }]}>
+                  {t('log.addFeeling')}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Intensity */}
+            <Text style={[styles.fieldLabel, { fontFamily: font(lang, 'semibold') }]}>
+              {t('log.intensity')}
+            </Text>
+            <View style={styles.intensityCard}>
+              <Slider
+                style={{ width: '100%', height: 36 }}
+                minimumValue={1}
+                maximumValue={5}
+                step={1}
+                value={intensity}
+                onValueChange={(v: number) => {
+                  if (v !== intensity) haptics.selection();
+                  setIntensity(v);
+                  setIntensityTouched(true);
+                }}
+                minimumTrackTintColor={accent}
+                maximumTrackTintColor="rgba(255,255,255,0.10)"
+                thumbTintColor={accent}
+              />
+              <Text style={[styles.intensityLabel, { fontFamily: font(lang, 'bold'), color: accent }]}>
+                {intensityLabels[intensity - 1]}
+              </Text>
+            </View>
+
+            {/* Tags */}
+            <Text style={[styles.fieldLabel, { fontFamily: font(lang, 'semibold') }]}>
+              {t('log.tags')}
+            </Text>
+            <View style={styles.tagsWrap}>
+              {tags.map((tag) => (
+                <Pressable
+                  key={tag}
+                  style={styles.tagChipActive}
+                  onPress={() => {
+                    haptics.selection();
+                    setTags((prev) => prev.filter((x) => x !== tag));
+                  }}
+                >
+                  <Text style={[styles.tagTextActive, { fontFamily: font(lang, 'semibold') }]}>
+                    #{tag}
+                  </Text>
+                  <Ionicons name="close" size={12} color={theme.colors.purpleSoft} />
+                </Pressable>
+              ))}
+              <TextInput
+                style={[styles.tagInput, { fontFamily: font(lang, 'regular') }]}
+                placeholder={t('log.tagPlaceholder')}
+                placeholderTextColor={theme.colors.inkFaint}
+                value={tagInput}
+                onChangeText={setTagInput}
+                onSubmitEditing={() => addTag(tagInput)}
+                returnKeyType="done"
+                autoCapitalize="none"
+              />
+            </View>
+            {tagSuggestions.filter((s) => !tags.includes(s)).length > 0 ? (
+              <View style={styles.tagsWrap}>
+                {tagSuggestions
+                  .filter((s) => !tags.includes(s))
+                  .slice(0, 8)
+                  .map((s) => (
+                    <Pressable key={s} style={styles.tagChip} onPress={() => addTag(s)}>
+                      <Text style={[styles.tagText, { fontFamily: font(lang, 'semibold') }]}>#{s}</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            ) : null}
+
+            {/* Attachments */}
+            <Text style={[styles.fieldLabel, { fontFamily: font(lang, 'semibold') }]}>
+              {t('log.attachments')}
+            </Text>
+            <View style={styles.attachRow}>
+              {photoUri ? (
+                <View style={styles.photoWrap}>
+                  <Image source={{ uri: photoUri }} style={styles.photoThumb} />
+                  <Pressable
+                    style={styles.attachRemove}
+                    hitSlop={8}
+                    onPress={() => {
+                      haptics.selection();
+                      setPhotoUri(null);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={20} color={theme.colors.ink} />
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable style={({ pressed }) => [styles.attachBtn, pressed && styles.pressed]} onPress={pickPhoto}>
+                  <Ionicons name="image-outline" size={20} color={theme.colors.tealSoft} />
+                  <Text style={[styles.attachText, { fontFamily: font(lang, 'semibold') }]}>
+                    {t('log.addPhoto')}
+                  </Text>
+                </Pressable>
+              )}
+
+              {audioUri ? (
+                <View style={[styles.attachBtn, styles.audioReady]}>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      haptics.selection();
+                      player.seekTo(0);
+                      player.play();
+                    }}
+                  >
+                    <Ionicons name="play-circle" size={22} color={theme.colors.tealSoft} />
+                  </Pressable>
+                  <Text style={[styles.attachText, { fontFamily: font(lang, 'semibold') }]}>
+                    {t('log.voiceMemo')}
+                  </Text>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      haptics.selection();
+                      setAudioUri(null);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={18} color={theme.colors.inkFaint} />
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.attachBtn,
+                    recorderState.isRecording && styles.recording,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={toggleRecording}
+                >
+                  <Ionicons
+                    name={recorderState.isRecording ? 'stop-circle' : 'mic-outline'}
+                    size={20}
+                    color={recorderState.isRecording ? theme.colors.danger : theme.colors.pinkSoft}
+                  />
+                  <Text
+                    style={[
+                      styles.attachText,
+                      { fontFamily: font(lang, 'semibold') },
+                      recorderState.isRecording && { color: theme.colors.danger },
+                    ]}
+                  >
+                    {recorderState.isRecording ? t('log.stopRecording') : t('log.recordVoice')}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Note */}
+            <Text style={[styles.fieldLabel, { fontFamily: font(lang, 'semibold') }]}>
+              {t('log.noteTitle')}
+            </Text>
             <TextInput
-              style={[
-                styles.noteInput,
-                { fontFamily: font(lang, 'regular'), borderColor: theme.colors.borderBright },
-              ]}
+              style={[styles.noteInput, { fontFamily: font(lang, 'regular') }]}
               placeholder={t('log.notePlaceholder')}
               placeholderTextColor={theme.colors.inkFaint}
               value={note}
@@ -296,13 +582,15 @@ export default function LogScreen() {
               maxLength={2000}
               selectionColor={accent}
             />
-            <Pressable onPress={save} disabled={saving}>
+
+            {/* Save / delete */}
+            <Pressable onPress={save} disabled={saving || feelings.length === 0}>
               {({ pressed }) => (
                 <LinearGradient
                   colors={theme.gradients.primary}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.saveBtn, pressed && styles.optionPressed]}
+                  style={[styles.saveBtn, (pressed || feelings.length === 0) && styles.pressed]}
                 >
                   <Ionicons name="checkmark" size={20} color="#FFFFFF" />
                   <Text style={[styles.saveText, { fontFamily: font(lang, 'bold') }]}>
@@ -313,7 +601,7 @@ export default function LogScreen() {
             </Pressable>
             {editingId != null ? (
               <Pressable
-                style={({ pressed }) => [styles.deleteBtn, pressed && styles.optionPressed]}
+                style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
                 onPress={confirmDelete}
               >
                 <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
@@ -322,7 +610,7 @@ export default function LogScreen() {
                 </Text>
               </Pressable>
             ) : null}
-          </Animated.View>
+          </Animated.ScrollView>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -414,8 +702,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  optionPressed: {
-    opacity: 0.85,
+  pressed: {
+    opacity: 0.8,
   },
   optionEmoji: {
     fontSize: 20,
@@ -430,22 +718,173 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'left',
   },
-  noteWrap: {
-    flex: 1,
+  details: {
     paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
+  },
+  feelingsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  feelingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: theme.radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  feelingChipEmoji: {
+    fontSize: 18,
+  },
+  feelingChipPath: {
+    fontSize: 10,
+    color: theme.colors.inkSoft,
+  },
+  feelingChipLeaf: {
+    fontSize: 14,
+  },
+  addFeelingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: theme.colors.borderBright,
+  },
+  addFeelingText: {
+    fontSize: 13,
+    color: theme.colors.purpleSoft,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.inkFaint,
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'left',
+  },
+  intensityCard: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.md,
+    alignItems: 'center',
+  },
+  intensityLabel: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  tagsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  tagChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  tagChipActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(124, 58, 237, 0.18)',
+    borderWidth: 1,
+    borderColor: theme.colors.purple,
+  },
+  tagText: {
+    fontSize: 12,
+    color: theme.colors.inkSoft,
+  },
+  tagTextActive: {
+    fontSize: 12,
+    color: theme.colors.purpleSoft,
+  },
+  tagInput: {
+    minWidth: 120,
+    flexGrow: 1,
+    backgroundColor: theme.colors.surfaceSolid,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    fontSize: 13,
+    color: theme.colors.ink,
+  },
+  attachRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  attachBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  recording: {
+    borderColor: theme.colors.danger,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  audioReady: {
+    borderColor: theme.colors.teal,
+  },
+  attachText: {
+    fontSize: 13,
+    color: theme.colors.inkSoft,
+  },
+  photoWrap: {
+    position: 'relative',
+  },
+  photoThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.borderBright,
+  },
+  attachRemove: {
+    position: 'absolute',
+    top: -8,
+    end: -8,
   },
   noteInput: {
     backgroundColor: theme.colors.surfaceSolid,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    minHeight: 140,
+    borderColor: theme.colors.borderBright,
+    minHeight: 110,
     padding: theme.spacing.md,
     fontSize: 15,
     color: theme.colors.ink,
     lineHeight: 22,
   },
   saveBtn: {
-    marginTop: theme.spacing.md,
+    marginTop: theme.spacing.lg,
     borderRadius: theme.radius.md,
     paddingVertical: 16,
     flexDirection: 'row',

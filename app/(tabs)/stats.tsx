@@ -111,18 +111,20 @@ export default function StatsScreen() {
 
   const coreStats: CoreStat[] = useMemo(() => {
     const stats: CoreStat[] = [];
+    const allFeelings = entries.flatMap((e) => e.feelings);
+    const totalFeelings = allFeelings.length || 1;
     for (const core of FEELINGS_WHEEL) {
-      const coreEntries = entries.filter((e) => e.coreId === core.id);
-      if (coreEntries.length === 0) continue;
+      const coreFeelings = allFeelings.filter((f) => f.coreId === core.id);
+      if (coreFeelings.length === 0) continue;
 
       const secondaryMap = new Map<string, Map<string, number>>();
-      for (const e of coreEntries) {
-        let terts = secondaryMap.get(e.secondaryId);
+      for (const f of coreFeelings) {
+        let terts = secondaryMap.get(f.secondaryId);
         if (!terts) {
           terts = new Map();
-          secondaryMap.set(e.secondaryId, terts);
+          secondaryMap.set(f.secondaryId, terts);
         }
-        terts.set(e.tertiaryId, (terts.get(e.tertiaryId) ?? 0) + 1);
+        terts.set(f.tertiaryId, (terts.get(f.tertiaryId) ?? 0) + 1);
       }
 
       const secondaries = Array.from(secondaryMap.entries())
@@ -146,8 +148,8 @@ export default function StatsScreen() {
 
       stats.push({
         core,
-        count: coreEntries.length,
-        percent: total > 0 ? Math.round((coreEntries.length / total) * 100) : 0,
+        count: coreFeelings.length,
+        percent: Math.round((coreFeelings.length / totalFeelings) * 100),
         secondaries,
       });
     }
@@ -165,7 +167,9 @@ export default function StatsScreen() {
 
   const positivity = useMemo(() => {
     if (total === 0) return 0;
-    const positive = entries.filter((e) => e.coreId === 'happy' || e.coreId === 'surprised').length;
+    const positive = entries.filter((e) =>
+      e.feelings.some((f) => f.coreId === 'happy' || f.coreId === 'surprised'),
+    ).length;
     return positive / total;
   }, [entries, total]);
 
@@ -226,17 +230,19 @@ export default function StatsScreen() {
   const topFeelings = useMemo(() => {
     const counts = new Map<string, { name: string; color: string; count: number }>();
     for (const e of entries) {
-      const key = `${e.coreId}/${e.secondaryId}/${e.tertiaryId}`;
-      const existing = counts.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        const core = getCore(e.coreId);
-        counts.set(key, {
-          name: label(getTertiary(e.coreId, e.secondaryId, e.tertiaryId), lang),
-          color: core?.color ?? theme.colors.purple,
-          count: 1,
-        });
+      for (const f of e.feelings) {
+        const key = `${f.coreId}/${f.secondaryId}/${f.tertiaryId}`;
+        const existing = counts.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          const core = getCore(f.coreId);
+          counts.set(key, {
+            name: label(getTertiary(f.coreId, f.secondaryId, f.tertiaryId), lang),
+            color: core?.color ?? theme.colors.purple,
+            count: 1,
+          });
+        }
       }
     }
     return Array.from(counts.values())

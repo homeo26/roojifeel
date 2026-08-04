@@ -59,7 +59,14 @@
           }
         }
       ],
-      "./plugins/withArm64Only"
+      "./plugins/withArm64Only",
+      "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Roojifeel needs photo access so you can attach a picture to a feeling."
+        }
+      ]
     ],
     "owner": "homeo26s-team"
   }

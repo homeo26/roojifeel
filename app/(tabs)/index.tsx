@@ -81,7 +81,9 @@ export default function HomeScreen() {
     const todays = entries.filter((e) => isSameDay(new Date(e.createdAt), today));
     if (todays.length === 0) return null;
     const counts = new Map<string, number>();
-    for (const e of todays) counts.set(e.coreId, (counts.get(e.coreId) ?? 0) + 1);
+    for (const e of todays)
+      for (const f of e.feelings) counts.set(f.coreId, (counts.get(f.coreId) ?? 0) + 1);
+    if (counts.size === 0) return null;
     const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
     return getCore(top[0]) ?? null;
   }, [entries, today]);
@@ -92,7 +94,9 @@ export default function HomeScreen() {
     const recent7 = entries.filter((e) => e.createdAt >= weekAgo);
     if (recent7.length === 0) return null;
     const counts = new Map<string, number>();
-    for (const e of recent7) counts.set(e.coreId, (counts.get(e.coreId) ?? 0) + 1);
+    for (const e of recent7)
+      for (const f of e.feelings) counts.set(f.coreId, (counts.get(f.coreId) ?? 0) + 1);
+    if (counts.size === 0) return null;
     const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
     return getCore(top[0]) ?? null;
   }, [entries]);

@@ -1,16 +1,32 @@
 /**
- * EntryCard — a glassy journal card for one feeling entry,
- * color-coded with the wheel colors of its core feeling.
+ * EntryCard — a glassy journal card for one feeling entry.
+ * v2: renders multiple feelings, intensity dots, tags, a photo
+ * thumbnail, and inline voice-memo playback.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import { FeelingEntry } from '../db';
 import { getCore, getSecondary, getTertiary, label } from '../data/feelings';
 import { theme, font } from '../theme';
 import { relativeTime, formatClock } from '../timeFormat';
+import * as haptics from '../haptics';
+
+/** One shared player so cards never overlap audio. */
+let sharedPlayer: AudioPlayer | null = null;
+function playAudio(uri: string) {
+  try {
+    sharedPlayer?.release();
+  } catch {
+    // released already
+  }
+  sharedPlayer = createAudioPlayer(uri);
+  sharedPlayer.play();
+}
 
 interface Props {
   entry: FeelingEntry;
@@ -23,15 +39,12 @@ export function EntryCard({ entry, index = 0, onLongPress }: Props) {
   const lang = i18n.language;
   const router = useRouter();
 
-  const core = getCore(entry.coreId);
-  const secondary = getSecondary(entry.coreId, entry.secondaryId);
-  const tertiary = getTertiary(entry.coreId, entry.secondaryId, entry.tertiaryId);
-  if (!core) return null;
+  const primary = entry.feelings[0];
+  const core = primary ? getCore(primary.coreId) : undefined;
+  if (!core || !primary) return null;
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(theme.motion.base).delay(Math.min(index, 6) * 40)}
-    >
+    <Animated.View entering={FadeIn.duration(theme.motion.base).delay(Math.min(index, 6) * 40)}>
       <Pressable
         onPress={() => router.push({ pathname: '/log', params: { editId: String(entry.id) } })}
         onLongPress={onLongPress}
@@ -40,37 +53,76 @@ export function EntryCard({ entry, index = 0, onLongPress }: Props) {
         <View style={[styles.stripe, { backgroundColor: core.color }]} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: core.tint, borderRadius: theme.radius.md }]} />
         <View style={styles.body}>
-          <View style={styles.headerRow}>
-            <Text style={styles.emoji}>{core.emoji}</Text>
-            <View style={styles.pathRow}>
-              <Text style={[styles.pathCore, { fontFamily: font(lang, 'bold'), color: core.colorMid }]}>
-                {label(core, lang)}
-              </Text>
-              {secondary ? (
-                <>
+          {/* Feelings */}
+          {entry.feelings.map((f, i) => {
+            const c = getCore(f.coreId);
+            const sec = getSecondary(f.coreId, f.secondaryId);
+            const tert = getTertiary(f.coreId, f.secondaryId, f.tertiaryId);
+            if (!c) return null;
+            return (
+              <View key={`${f.coreId}-${f.tertiaryId}-${i}`} style={[styles.headerRow, i > 0 && styles.extraFeeling]}>
+                <Text style={styles.emoji}>{c.emoji}</Text>
+                <View style={styles.pathRow}>
+                  <Text style={[styles.pathCore, { fontFamily: font(lang, 'bold'), color: c.colorMid }]}>
+                    {label(c, lang)}
+                  </Text>
                   <Text style={styles.pathSep}>›</Text>
                   <Text style={[styles.pathMid, { fontFamily: font(lang, 'semibold') }]}>
-                    {label(secondary, lang)}
+                    {label(sec, lang)}
                   </Text>
-                </>
-              ) : null}
-              {tertiary ? (
-                <>
                   <Text style={styles.pathSep}>›</Text>
-                  <Text style={[styles.pathLeaf, { fontFamily: font(lang, 'bold'), color: core.colorMid }]}>
-                    {label(tertiary, lang)}
+                  <Text style={[styles.pathLeaf, { fontFamily: font(lang, 'bold'), color: c.colorMid }]}>
+                    {label(tert, lang)}
                   </Text>
-                </>
-              ) : null}
-            </View>
-          </View>
+                </View>
+                {i === 0 && entry.intensity != null ? (
+                  <View style={styles.intensityRow}>
+                    {[1, 2, 3, 4, 5].map((d) => (
+                      <View
+                        key={d}
+                        style={[
+                          styles.intensityDot,
+                          { backgroundColor: d <= (entry.intensity ?? 0) ? c.color : 'rgba(255,255,255,0.12)' },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+
           {entry.note ? (
             <Text style={[styles.note, { fontFamily: font(lang, 'regular') }]}>{entry.note}</Text>
           ) : null}
+
+          {/* Tags */}
+          {entry.tags.length > 0 ? (
+            <View style={styles.tagRow}>
+              {entry.tags.map((tag) => (
+                <View key={tag} style={styles.tagPill}>
+                  <Text style={[styles.tagText, { fontFamily: font(lang, 'semibold') }]}>#{tag}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Footer */}
           <View style={styles.footerRow}>
             <Text style={[styles.time, { fontFamily: font(lang, 'semibold') }]}>
               {relativeTime(entry.createdAt, t, lang)} · {formatClock(entry.createdAt, lang)}
             </Text>
+            {entry.audioUri ? (
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  haptics.selection();
+                  playAudio(entry.audioUri!);
+                }}
+              >
+                <Ionicons name="play-circle" size={18} color={theme.colors.tealSoft} />
+              </Pressable>
+            ) : null}
             {entry.edited ? (
               <View style={styles.editedTag}>
                 <Text style={[styles.editedTagText, { fontFamily: font(lang, 'semibold') }]}>
@@ -80,6 +132,8 @@ export function EntryCard({ entry, index = 0, onLongPress }: Props) {
             ) : null}
           </View>
         </View>
+
+        {entry.photoUri ? <Image source={{ uri: entry.photoUri }} style={styles.photo} /> : null}
       </Pressable>
     </Animated.View>
   );
@@ -95,6 +149,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     overflow: 'hidden',
   },
+  cardPressed: {
+    opacity: 0.8,
+  },
   stripe: {
     width: 3,
     zIndex: 1,
@@ -107,6 +164,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  extraFeeling: {
+    marginTop: 4,
   },
   emoji: {
     fontSize: 18,
@@ -132,6 +192,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.inkFaint,
   },
+  intensityRow: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  intensityDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
   note: {
     marginTop: 6,
     fontSize: 13,
@@ -139,8 +208,21 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: 'left',
   },
-  cardPressed: {
-    opacity: 0.8,
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  tagPill: {
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(124, 58, 237, 0.14)',
+  },
+  tagText: {
+    fontSize: 10,
+    color: theme.colors.purpleSoft,
   },
   footerRow: {
     flexDirection: 'row',
@@ -167,5 +249,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: theme.colors.inkSoft,
+  },
+  photo: {
+    width: 72,
+    alignSelf: 'stretch',
+    borderStartWidth: 1,
+    borderStartColor: theme.colors.border,
   },
 });
