@@ -6,6 +6,12 @@ drill down through the wheel's three rings (core → branch → exact feeling),
 add an optional note about why, and Roojifeel keeps it on your device with
 the exact date and minute. Nothing is ever uploaded.
 
+## Screenshots
+
+| Home | Log a feeling | Stats | Journal |
+|:---:|:---:|:---:|:---:|
+| ![Home](docs/screenshots/home.png) | ![Log](docs/screenshots/log.png) | ![Stats](docs/screenshots/stats.png) | ![Journal](docs/screenshots/history.png) |
+
 ## Features
 
 - **3-level feeling picker** mirroring the classic feelings wheel
