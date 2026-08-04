@@ -1,15 +1,29 @@
 {
   "expo": {
     "name": "Roojifeel",
-    "slug": "Roojifeel",
+    "slug": "roojifeel",
+    "scheme": "roojifeel",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "extra": {
+      "supportsRTL": true,
+      "router": {},
+      "eas": {
+        "projectId": "c78dbc2c-3b71-4296-8c06-068e1bdad963"
+      }
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.roojifeel.app",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true,
+        "ExpoLocalization_supportsRTL": true
+      }
     },
     "android": {
+      "package": "com.roojifeel.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,6 +34,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-sqlite",
+      "expo-localization",
+      "expo-sharing",
+      "expo-font",
+      "expo-notifications"
+    ],
+    "owner": "homeo26s-team"
   }
 }

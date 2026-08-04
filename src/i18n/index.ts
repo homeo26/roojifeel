@@ -1,0 +1,275 @@
+/**
+ * Roojifeel i18n — English + Arabic with RTL awareness.
+ */
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import * as Localization from 'expo-localization';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const LANG_KEY = 'roojifeel.lang';
+
+const en = {
+  translation: {
+    appName: 'Roojifeel',
+    tabs: { home: 'Home', history: 'History', stats: 'Stats', settings: 'Settings' },
+    home: {
+      greeting: 'Hey there 👋',
+      prompt: 'What are you feeling right now?',
+      logFeeling: 'Log a feeling',
+      todayCount_zero: 'No check-ins yet today',
+      todayCount_one: '1 check-in today',
+      todayCount_other: '{{count}} check-ins today',
+      recent: 'Recent feelings',
+      statToday: 'Today',
+      statStreak: 'Streak',
+      statStreakUnit: 'days in a row',
+      statTotal: 'All time',
+      statTotalUnit: 'check-ins',
+      activity: 'Last 14 days',
+      empty: 'This is your cozy corner.\nTap the button and name your first feeling.',
+    },
+    log: {
+      stepCore: 'Pick the closest vibe',
+      ringCore: 'Core',
+      ringSecondary: 'Branch',
+      ringTertiary: 'Exact',
+      stepSecondary: 'Getting warmer…',
+      stepTertiary: 'Name it exactly',
+      noteTitle: 'Why do you feel this way?',
+      notePlaceholder: 'Write a little note… (optional)',
+      save: 'Save feeling',
+      update: 'Update feeling',
+      back: 'Back',
+      saved: 'Feeling saved 💛',
+      youChose: 'You chose',
+    },
+    entry: { edited: 'edited' },
+    history: {
+      title: 'Your journal',
+      empty: 'No feelings logged yet.\nYour story starts with one check-in.',
+      deleteTitle: 'Delete entry?',
+      deleteMessage: 'This will remove the feeling from your journal.',
+      delete: 'Delete',
+      cancel: 'Cancel',
+    },
+    stats: {
+      title: 'Your patterns',
+      range: 'Time range',
+      days_one: '{{count}} day',
+      days_other: '{{count}} days',
+      week: '7 days',
+      twoWeeks: '14 days',
+      month: '30 days',
+      quarter: '90 days',
+      totalCheckins_zero: 'No check-ins in this period',
+      totalCheckins_one: '1 check-in in this period',
+      totalCheckins_other: '{{count}} check-ins in this period',
+      coreBreakdown: 'Feeling distribution',
+      checkinsCaption: 'check-ins',
+      gaugeConsistency: 'Consistency',
+      gaugeDays: 'days logged',
+      gaugePositivity: 'Positivity',
+      gaugePositive: 'happy + surprised',
+      activityLabel: 'Daily check-ins · last {{count}} days',
+      timesFelt_one: 'once',
+      timesFelt_other: '{{count}} times',
+      ofPeriod: '{{percent}}% of check-ins',
+      branchDetail: 'Tap a feeling to see its branches',
+      topFeelings: 'Your most named feelings',
+      empty: 'Log some feelings and your patterns will bloom here 🌱',
+      daysWithCheckin: 'You checked in on {{days}} of the last {{total}} days',
+    },
+    settings: {
+      title: 'Settings',
+      reminders: 'Daily reminder',
+      remindersDesc: 'A gentle nudge to check in with yourself',
+      reminderTime: 'Reminder time',
+      language: 'Language',
+      english: 'English',
+      arabic: 'العربية',
+      data: 'Your data',
+      export: 'Export history',
+      exportDesc: 'Share a JSON file of all your feelings',
+      import: 'Import history',
+      importDesc: 'Restore feelings from a JSON file',
+      imported_zero: 'No new entries found in that file',
+      imported_one: 'Imported 1 entry',
+      imported_other: 'Imported {{count}} entries',
+      importError: 'That file does not look like a Roojifeel export.',
+      exportEmpty: 'Nothing to export yet — log a feeling first!',
+      notifTitle: 'What are you feeling right now? 💭',
+      notifBody: 'Take a cozy minute to check in with yourself.',
+      permissionDenied: 'Notifications are disabled. Enable them in system settings.',
+      restartForRTL: 'Please restart the app to fully apply the layout direction.',
+      about: 'Roojifeel keeps every feeling on your device. Nothing is uploaded, ever.',
+    },
+    time: {
+      justNow: 'just now',
+      minutesAgo_one: '{{count}} min ago',
+      minutesAgo_other: '{{count}} min ago',
+      hoursAgo_one: '{{count}} hour ago',
+      hoursAgo_other: '{{count}} hours ago',
+      today: 'Today',
+      yesterday: 'Yesterday',
+    },
+  },
+};
+
+const ar = {
+  translation: {
+    appName: 'روجيفيل',
+    tabs: { home: 'الرئيسية', history: 'السجل', stats: 'الإحصائيات', settings: 'الإعدادات' },
+    home: {
+      greeting: 'أهلاً بك 👋',
+      prompt: 'بماذا تشعر الآن؟',
+      logFeeling: 'سجّل شعوراً',
+      todayCount_zero: 'لا تسجيلات اليوم بعد',
+      todayCount_one: 'تسجيل واحد اليوم',
+      todayCount_two: 'تسجيلان اليوم',
+      todayCount_few: '{{count}} تسجيلات اليوم',
+      todayCount_many: '{{count}} تسجيلاً اليوم',
+      todayCount_other: '{{count}} تسجيل اليوم',
+      recent: 'مشاعرك الأخيرة',
+      statToday: 'اليوم',
+      statStreak: 'التتابع',
+      statStreakUnit: 'أيام متتالية',
+      statTotal: 'الإجمالي',
+      statTotalUnit: 'تسجيلات',
+      activity: 'آخر ١٤ يوماً',
+      empty: 'هذه زاويتك الدافئة.\nاضغط الزر وسمِّ شعورك الأول.',
+    },
+    log: {
+      stepCore: 'اختر الشعور الأقرب',
+      ringCore: 'الأساس',
+      ringSecondary: 'الفرع',
+      ringTertiary: 'الدقيق',
+      stepSecondary: 'اقتربت أكثر…',
+      stepTertiary: 'سمِّه بدقة',
+      noteTitle: 'لماذا تشعر هكذا؟',
+      notePlaceholder: 'اكتب ملاحظة صغيرة… (اختياري)',
+      save: 'احفظ الشعور',
+      update: 'حدّث الشعور',
+      back: 'رجوع',
+      saved: 'تم حفظ الشعور 💛',
+      youChose: 'اخترت',
+    },
+    entry: { edited: 'معدّل' },
+    history: {
+      title: 'دفتر مشاعرك',
+      empty: 'لم تسجّل أي شعور بعد.\nحكايتك تبدأ بتسجيل واحد.',
+      deleteTitle: 'حذف التسجيل؟',
+      deleteMessage: 'سيُحذف هذا الشعور من دفترك.',
+      delete: 'حذف',
+      cancel: 'إلغاء',
+    },
+    stats: {
+      title: 'أنماط مشاعرك',
+      range: 'الفترة الزمنية',
+      days_one: 'يوم واحد',
+      days_two: 'يومان',
+      days_few: '{{count}} أيام',
+      days_many: '{{count}} يوماً',
+      days_other: '{{count}} يوم',
+      week: '٧ أيام',
+      twoWeeks: '١٤ يوماً',
+      month: '٣٠ يوماً',
+      quarter: '٩٠ يوماً',
+      totalCheckins_zero: 'لا تسجيلات في هذه الفترة',
+      totalCheckins_one: 'تسجيل واحد في هذه الفترة',
+      totalCheckins_two: 'تسجيلان في هذه الفترة',
+      totalCheckins_few: '{{count}} تسجيلات في هذه الفترة',
+      totalCheckins_many: '{{count}} تسجيلاً في هذه الفترة',
+      totalCheckins_other: '{{count}} تسجيل في هذه الفترة',
+      coreBreakdown: 'توزيع المشاعر',
+      checkinsCaption: 'تسجيلات',
+      gaugeConsistency: 'الانتظام',
+      gaugeDays: 'أيام مسجلة',
+      gaugePositivity: 'الإيجابية',
+      gaugePositive: 'سعيد + متفاجئ',
+      activityLabel: 'التسجيلات اليومية · آخر {{count}} يوماً',
+      timesFelt_one: 'مرة واحدة',
+      timesFelt_two: 'مرتان',
+      timesFelt_few: '{{count}} مرات',
+      timesFelt_many: '{{count}} مرة',
+      timesFelt_other: '{{count}} مرة',
+      ofPeriod: '{{percent}}٪ من التسجيلات',
+      branchDetail: 'اضغط على شعور لترى فروعه',
+      topFeelings: 'أكثر مشاعرك تسمية',
+      empty: 'سجّل بعض المشاعر وستتفتح أنماطك هنا 🌱',
+      daysWithCheckin: 'سجّلت في {{days}} من آخر {{total}} يوماً',
+    },
+    settings: {
+      title: 'الإعدادات',
+      reminders: 'تذكير يومي',
+      remindersDesc: 'لمسة لطيفة لتطمئن على نفسك',
+      reminderTime: 'وقت التذكير',
+      language: 'اللغة',
+      english: 'English',
+      arabic: 'العربية',
+      data: 'بياناتك',
+      export: 'تصدير السجل',
+      exportDesc: 'شارك ملف JSON لكل مشاعرك',
+      import: 'استيراد السجل',
+      importDesc: 'استعد مشاعرك من ملف JSON',
+      imported_zero: 'لا توجد تسجيلات جديدة في هذا الملف',
+      imported_one: 'تم استيراد تسجيل واحد',
+      imported_two: 'تم استيراد تسجيلين',
+      imported_few: 'تم استيراد {{count}} تسجيلات',
+      imported_many: 'تم استيراد {{count}} تسجيلاً',
+      imported_other: 'تم استيراد {{count}} تسجيل',
+      importError: 'هذا الملف لا يبدو ملف تصدير من روجيفيل.',
+      exportEmpty: 'لا شيء للتصدير بعد — سجّل شعوراً أولاً!',
+      notifTitle: 'بماذا تشعر الآن؟ 💭',
+      notifBody: 'خذ دقيقة دافئة لتطمئن على نفسك.',
+      permissionDenied: 'الإشعارات معطلة. فعّلها من إعدادات النظام.',
+      restartForRTL: 'يرجى إعادة تشغيل التطبيق لتطبيق اتجاه الواجهة كاملاً.',
+      about: 'روجيفيل يحفظ كل شعور على جهازك. لا يُرفع أي شيء أبداً.',
+    },
+    time: {
+      justNow: 'الآن',
+      minutesAgo_one: 'قبل دقيقة',
+      minutesAgo_two: 'قبل دقيقتين',
+      minutesAgo_few: 'قبل {{count}} دقائق',
+      minutesAgo_many: 'قبل {{count}} دقيقة',
+      minutesAgo_other: 'قبل {{count}} دقيقة',
+      hoursAgo_one: 'قبل ساعة',
+      hoursAgo_two: 'قبل ساعتين',
+      hoursAgo_few: 'قبل {{count}} ساعات',
+      hoursAgo_many: 'قبل {{count}} ساعة',
+      hoursAgo_other: 'قبل {{count}} ساعة',
+      today: 'اليوم',
+      yesterday: 'أمس',
+    },
+  },
+};
+
+export function detectInitialLanguage(): string {
+  const locales = Localization.getLocales();
+  const first = locales[0]?.languageCode;
+  return first === 'ar' ? 'ar' : 'en';
+}
+
+export async function loadSavedLanguage(): Promise<string> {
+  try {
+    const saved = await AsyncStorage.getItem(LANG_KEY);
+    return saved ?? detectInitialLanguage();
+  } catch {
+    return detectInitialLanguage();
+  }
+}
+
+export async function saveLanguage(lang: string): Promise<void> {
+  await AsyncStorage.setItem(LANG_KEY, lang);
+}
+
+export function initI18n(lang: string): void {
+  if (i18n.isInitialized) return;
+  i18n.use(initReactI18next).init({
+    resources: { en, ar },
+    lng: lang,
+    fallbackLng: 'en',
+    interpolation: { escapeValue: false },
+  });
+}
+
+export default i18n;
