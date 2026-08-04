@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { theme, font } from '../../src/theme';
 import { saveLanguage } from '../../src/i18n';
