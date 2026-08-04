@@ -3,6 +3,7 @@ import { I18nManager, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import {
   useFonts,
   Manrope_400Regular,
@@ -68,6 +69,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -89,6 +91,7 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

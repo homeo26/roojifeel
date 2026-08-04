@@ -7,7 +7,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -22,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import * as haptics from '../src/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
@@ -75,7 +75,6 @@ export default function LogScreen() {
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const detailsScrollRef = useRef<ScrollView>(null);
 
   // Voice memo recording/playback.
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -291,10 +290,7 @@ export default function LogScreen() {
       style={[styles.safe, { direction: lang === 'ar' ? 'rtl' : 'ltr' }]}
       edges={['top', 'bottom']}
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={goBack} hitSlop={12} style={styles.backBtn}>
@@ -398,9 +394,8 @@ export default function LogScreen() {
             })}
           </Animated.ScrollView>
         ) : (
-          <Animated.ScrollView
-            ref={detailsScrollRef}
-            entering={fadeIn()}
+          <KeyboardAwareScrollView
+            bottomOffset={24}
             contentContainerStyle={styles.details}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -612,10 +607,6 @@ export default function LogScreen() {
               textAlign={lang === 'ar' ? 'right' : 'left'}
               maxLength={2000}
               selectionColor={accent}
-              onFocus={() => {
-                // Bring the note above the keyboard once it has animated in.
-                setTimeout(() => detailsScrollRef.current?.scrollToEnd({ animated: true }), 300);
-              }}
             />
 
             {/* Save / delete */}
@@ -645,9 +636,9 @@ export default function LogScreen() {
                 </Text>
               </Pressable>
             ) : null}
-          </Animated.ScrollView>
+          </KeyboardAwareScrollView>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
