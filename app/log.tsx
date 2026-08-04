@@ -3,7 +3,7 @@
  * support for MULTIPLE feelings per check-in, then a details step:
  * intensity slider, tags, photo, voice memo, and an optional note.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -75,6 +75,7 @@ export default function LogScreen() {
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const detailsScrollRef = useRef<ScrollView>(null);
 
   // Voice memo recording/playback.
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -378,6 +379,7 @@ export default function LogScreen() {
           </Animated.ScrollView>
         ) : (
           <Animated.ScrollView
+            ref={detailsScrollRef}
             entering={fadeIn()}
             contentContainerStyle={styles.details}
             showsVerticalScrollIndicator={false}
@@ -590,6 +592,10 @@ export default function LogScreen() {
               textAlign={lang === 'ar' ? 'right' : 'left'}
               maxLength={2000}
               selectionColor={accent}
+              onFocus={() => {
+                // Bring the note above the keyboard once it has animated in.
+                setTimeout(() => detailsScrollRef.current?.scrollToEnd({ animated: true }), 300);
+              }}
             />
 
             {/* Save / delete */}
@@ -729,7 +735,7 @@ const styles = StyleSheet.create({
   },
   details: {
     paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.xl * 2,
   },
   feelingsWrap: {
     flexDirection: 'row',

@@ -16,7 +16,7 @@ import { FEELINGS_WHEEL, getCore } from '../../src/data/feelings';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EntryCard } from '../../src/components/EntryCard';
 import { ActivityBars } from '../../src/components/Charts';
-import { theme, font } from '../../src/theme';
+import { theme, font, displayFont } from '../../src/theme';
 import { isSameDay } from '../../src/timeFormat';
 import { claimMilestone, computeStreak, nextMilestone } from '../../src/streaks';
 import { refreshWidget } from '../../src/widget/RoojifeelWidget';
@@ -47,6 +47,15 @@ export default function HomeScreen() {
   );
 
   const today = new Date();
+  const hour = today.getHours();
+  const greetingKey =
+    hour >= 5 && hour < 12
+      ? 'greetingMorning'
+      : hour >= 12 && hour < 17
+        ? 'greetingAfternoon'
+        : hour >= 17 && hour < 22
+          ? 'greetingEvening'
+          : 'greetingNight';
   const todayCount = entries.filter((e) => isSameDay(new Date(e.createdAt), today)).length;
   const recent = entries.slice(0, 4);
 
@@ -124,15 +133,25 @@ export default function HomeScreen() {
           <View>
             {/* Hero */}
             <Animated.View entering={fade()}>
-              <View style={styles.eyebrowRow}>
-                <View style={styles.eyebrowDot} />
-                <Text style={[styles.eyebrow, { fontFamily: font(lang, 'semibold') }]}>
-                  {t('appName')}
+              <View style={styles.dateRow}>
+                <View style={styles.dateDot} />
+                <Text style={[styles.dateText, { fontFamily: font(lang, 'semibold') }]}>
+                  {new Date().toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
                 </Text>
               </View>
-              <Text style={[styles.greeting, { fontFamily: font(lang, 'extrabold') }]}>
-                {t('home.greeting')}
+              <Text style={[styles.greeting, { fontFamily: displayFont(lang) }]}>
+                {t(`home.${greetingKey}`)}
               </Text>
+              <LinearGradient
+                colors={theme.gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.greetingAccent}
+              />
               <Text style={[styles.prompt, { fontFamily: font(lang, 'regular') }]}>
                 {t('home.prompt')}
               </Text>
@@ -398,42 +417,42 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xl,
   },
-  eyebrowRow: {
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    alignSelf: 'flex-start',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    marginTop: theme.spacing.sm,
+    marginTop: theme.spacing.md,
   },
-  eyebrowDot: {
+  dateDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
     backgroundColor: theme.colors.teal,
   },
-  eyebrow: {
+  dateText: {
     fontSize: 11,
-    letterSpacing: 1.2,
+    letterSpacing: 2,
     textTransform: 'uppercase',
     color: theme.colors.inkSoft,
   },
   greeting: {
-    fontSize: 32,
-    letterSpacing: -0.8,
+    fontSize: 38,
+    letterSpacing: -1.2,
+    lineHeight: 44,
     color: theme.colors.ink,
-    marginTop: theme.spacing.md,
+    marginTop: theme.spacing.sm,
     textAlign: 'left',
+  },
+  greetingAccent: {
+    width: 64,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 10,
   },
   prompt: {
     fontSize: 15,
     color: theme.colors.inkSoft,
-    marginTop: 4,
+    marginTop: 12,
     textAlign: 'left',
   },
   logButton: {

@@ -10,6 +10,7 @@ import {
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
+import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import {
   IBMPlexSansArabic_400Regular,
   IBMPlexSansArabic_600SemiBold,
@@ -28,6 +29,8 @@ export default function RootLayout() {
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_700Bold,
     IBMPlexSansArabic_400Regular,
     IBMPlexSansArabic_600SemiBold,
     IBMPlexSansArabic_700Bold,

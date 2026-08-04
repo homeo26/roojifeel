@@ -57,6 +57,8 @@ export const theme = {
     semibold: 'Manrope_600SemiBold',
     bold: 'Manrope_700Bold',
     extrabold: 'Manrope_800ExtraBold',
+    display: 'SpaceGrotesk_700Bold',
+    displayMedium: 'SpaceGrotesk_500Medium',
     arRegular: 'IBMPlexSansArabic_400Regular',
     arSemibold: 'IBMPlexSansArabic_600SemiBold',
     arBold: 'IBMPlexSansArabic_700Bold',
@@ -84,6 +86,11 @@ export const theme = {
     easing: Easing.bezier(0.4, 0, 0.2, 1),
   },
 } as const;
+
+/** Display font for hero titles — Space Grotesk for Latin, Plex bold for Arabic. */
+export function displayFont(lang: string): string {
+  return lang === 'ar' ? theme.fonts.arBold : theme.fonts.display;
+}
 
 /** Pick the right font family for the active language. */
 export function font(lang: string, weight: 'regular' | 'semibold' | 'bold' | 'extrabold'): string {
