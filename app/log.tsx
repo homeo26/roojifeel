@@ -43,6 +43,7 @@ import {
 } from '../src/data/feelings';
 import { FeelingPath, addEntry, deleteEntry, getAllTags, getEntry, updateEntry } from '../src/db';
 import { deleteAttachment, isPersisted, persistAttachment } from '../src/attachments';
+import { syncSmartReminders } from '../src/notifications';
 import { theme, font } from '../src/theme';
 
 type Step = 0 | 1 | 2 | 3;
@@ -220,6 +221,12 @@ export default function LogScreen() {
       await addEntry({ ...payload, createdAt: Date.now() });
     }
     haptics.success();
+    syncSmartReminders({
+      title: t('settings.notifTitle'),
+      body: t('settings.notifBody'),
+      nudgeTitle: t('settings.nudgeTitle'),
+      nudgeBody: t('settings.nudgeBody'),
+    }).catch(() => {});
     router.back();
   };
 

@@ -17,6 +17,8 @@ import {
 } from '@expo-google-fonts/ibm-plex-sans-arabic';
 import { initI18n, loadSavedLanguage } from '../src/i18n';
 import { loadHapticsPref } from '../src/haptics';
+import i18next from 'i18next';
+import { syncSmartReminders } from '../src/notifications';
 import { theme } from '../src/theme';
 
 export default function RootLayout() {
@@ -36,6 +38,13 @@ export default function RootLayout() {
       const lang = await loadSavedLanguage();
       initI18n(lang);
       await loadHapticsPref();
+      // Recompute the smart reminder schedule (skip-if-logged + nudge).
+      syncSmartReminders({
+        title: i18next.t('settings.notifTitle'),
+        body: i18next.t('settings.notifBody'),
+        nudgeTitle: i18next.t('settings.nudgeTitle'),
+        nudgeBody: i18next.t('settings.nudgeBody'),
+      }).catch(() => {});
       // Keep the NATIVE direction pinned to LTR on both platforms.
       // RTL is applied deterministically in JS via per-screen `direction`
       // styles and the custom tab bar, so iOS and Android behave the same

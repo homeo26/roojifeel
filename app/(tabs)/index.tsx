@@ -18,6 +18,7 @@ import { EntryCard } from '../../src/components/EntryCard';
 import { ActivityBars } from '../../src/components/Charts';
 import { theme, font } from '../../src/theme';
 import { isSameDay } from '../../src/timeFormat';
+import { claimMilestone, computeStreak, nextMilestone } from '../../src/streaks';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   const lang = i18n.language;
   const router = useRouter();
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
+  const [celebration, setCelebration] = useState<number | null>(null);
   const scale = useSharedValue(1);
 
   useFocusEffect(
@@ -46,24 +48,15 @@ export default function HomeScreen() {
   const todayCount = entries.filter((e) => isSameDay(new Date(e.createdAt), today)).length;
   const recent = entries.slice(0, 4);
 
-  // Streak: consecutive days (ending today or yesterday) with >= 1 check-in.
-  const streak = useMemo(() => {
-    const days = new Set(
-      entries.map((e) => {
-        const d = new Date(e.createdAt);
-        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-      }),
-    );
-    let count = 0;
-    let cursor = new Date();
-    const key = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    if (!days.has(key(cursor))) cursor = new Date(cursor.getTime() - DAY_MS);
-    while (days.has(key(cursor))) {
-      count += 1;
-      cursor = new Date(cursor.getTime() - DAY_MS);
-    }
-    return count;
-  }, [entries]);
+  const streak = useMemo(() => computeStreak(entries), [entries]);
+
+  // One-time cozy celebration when a milestone is first reached.
+  React.useEffect(() => {
+    if (streak === 0) return;
+    claimMilestone(streak).then((m) => {
+      if (m != null) setCelebration(m);
+    });
+  }, [streak]);
 
   // Last 14 days of activity, oldest first.
   const activity = useMemo(() => {
@@ -211,7 +204,13 @@ export default function HomeScreen() {
                     : '—',
                   subColor: dominantCore?.colorMid,
                 },
-                { label: t('home.statStreak'), value: String(streak), sub: t('home.statStreakUnit') },
+                {
+                  label: t('home.statStreak'),
+                  value: String(streak),
+                  sub: nextMilestone(streak) != null
+                    ? t('home.nextMilestone', { next: nextMilestone(streak) })
+                    : t('home.statStreakUnit'),
+                },
                 { label: t('home.statTotal'), value: String(entries.length), sub: t('home.statTotalUnit') },
               ].map((tile) => (
                 <Pressable
@@ -326,11 +325,69 @@ export default function HomeScreen() {
           <EntryCard entry={item} index={index} onLongPress={() => confirmDelete(item)} />
         )}
       />
+      {celebration != null ? (
+        <Pressable style={styles.celebrationBackdrop} onPress={() => setCelebration(null)}>
+          <Animated.View entering={FadeIn.duration(250)} style={styles.celebrationCard}>
+            <Text style={styles.celebrationEmoji}>🎉</Text>
+            <Text style={[styles.celebrationTitle, { fontFamily: font(lang, 'extrabold') }]}>
+              {t('home.milestoneTitle', { count: celebration })}
+            </Text>
+            <Text style={[styles.celebrationSub, { fontFamily: font(lang, 'regular') }]}>
+              {t('home.milestoneSub')}
+            </Text>
+            <Text style={[styles.celebrationDismiss, { fontFamily: font(lang, 'semibold') }]}>
+              {t('home.milestoneDismiss')}
+            </Text>
+          </Animated.View>
+        </Pressable>
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  celebrationBackdrop: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+  },
+  celebrationCard: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceSolid,
+    borderWidth: 1,
+    borderColor: theme.colors.purple,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    gap: 8,
+    ...theme.shadow.glow,
+  },
+  celebrationEmoji: {
+    fontSize: 44,
+  },
+  celebrationTitle: {
+    fontSize: 20,
+    color: theme.colors.ink,
+    textAlign: 'center',
+  },
+  celebrationSub: {
+    fontSize: 13,
+    color: theme.colors.inkSoft,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  celebrationDismiss: {
+    marginTop: theme.spacing.sm,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.purpleSoft,
+  },
   safe: {
     flex: 1,
     backgroundColor: theme.colors.background,

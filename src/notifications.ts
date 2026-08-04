@@ -36,24 +36,87 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return request.granted;
 }
 
-/** Persist the reminder list and (re)schedule a daily notification per time. */
+/** Persist the reminder list and re-sync the smart schedule. */
 export async function applyReminders(
   reminders: ReminderTime[],
   title: string,
   body: string,
 ): Promise<void> {
   await AsyncStorage.setItem(REMINDERS_KEY, JSON.stringify(reminders));
+  await syncSmartReminders({ title, body });
+}
+
+export interface ReminderStrings {
+  title: string;
+  body: string;
+  nudgeTitle?: string;
+  nudgeBody?: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Smart scheduling — recomputed on every app open and after every save:
+ *  • For each reminder time, schedule concrete date triggers for the next
+ *    7 days, SKIPPING the remaining reminders today if a feeling was
+ *    already logged today ("don't nag me, I already checked in").
+ *  • If the user has logged before, schedule a gentle nudge 3 days after
+ *    the most recent entry (re-anchored on every new entry).
+ */
+export async function syncSmartReminders(strings: ReminderStrings): Promise<void> {
+  const reminders = await loadReminders();
   await Notifications.cancelAllScheduledNotificationsAsync();
+  if (reminders.length === 0 && !strings.nudgeTitle) return;
+
+  // Lazy import to avoid a require cycle (db never imports notifications).
+  const { getEntriesBetween, getAllEntries } = await import('./db');
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const loggedToday =
+    (await getEntriesBetween(startOfToday, startOfToday + DAY_MS - 1)).length > 0;
+
+  const channelId = Platform.OS === 'android' ? 'reminders' : undefined;
+
   for (const r of reminders) {
-    await Notifications.scheduleNotificationAsync({
-      content: { title, body, sound: false },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: r.hour,
-        minute: r.minute,
-        channelId: Platform.OS === 'android' ? 'reminders' : undefined,
-      },
-    });
+    for (let day = 0; day < 7; day++) {
+      const fireAt = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + day,
+        r.hour,
+        r.minute,
+        0,
+      );
+      if (fireAt.getTime() <= Date.now()) continue; // already past
+      if (day === 0 && loggedToday) continue; // smart skip
+      await Notifications.scheduleNotificationAsync({
+        content: { title: strings.title, body: strings.body, sound: false },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: fireAt,
+          channelId,
+        },
+      });
+    }
+  }
+
+  // Inactivity nudge.
+  if (strings.nudgeTitle && strings.nudgeBody) {
+    const all = await getAllEntries();
+    if (all.length > 0) {
+      const last = all[0].createdAt; // newest first
+      let nudgeAt = last + 3 * DAY_MS;
+      if (nudgeAt <= Date.now()) nudgeAt = Date.now() + 4 * 60 * 60 * 1000; // already overdue → later today
+      await Notifications.scheduleNotificationAsync({
+        content: { title: strings.nudgeTitle, body: strings.nudgeBody, sound: false },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(nudgeAt),
+          channelId,
+        },
+      });
+    }
   }
 }
 
