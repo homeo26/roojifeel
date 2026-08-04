@@ -26,6 +26,9 @@ const en = {
       statTotal: 'All time',
       statTotalUnit: 'check-ins',
       activity: 'Last 14 days',
+      quickLog: 'In one tap — how do you feel?',
+      insightTitle: 'This week you mostly felt',
+      viewAll: 'View all',
       empty: 'This is your cozy corner.\nTap the button and name your first feeling.',
     },
     log: {
@@ -164,6 +167,9 @@ const ar = {
       statTotal: 'الإجمالي',
       statTotalUnit: 'تسجيلات',
       activity: 'آخر ١٤ يوماً',
+      quickLog: 'بلمسة واحدة — بماذا تشعر؟',
+      insightTitle: 'هذا الأسبوع شعرت غالباً بـ',
+      viewAll: 'عرض الكل',
       empty: 'هذه زاويتك الدافئة.\nاضغط الزر وسمِّ شعورك الأول.',
     },
     log: {

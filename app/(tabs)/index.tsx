@@ -12,7 +12,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { FeelingEntry, deleteEntry, getAllEntries } from '../../src/db';
-import { getCore } from '../../src/data/feelings';
+import { FEELINGS_WHEEL, getCore } from '../../src/data/feelings';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { EntryCard } from '../../src/components/EntryCard';
 import { ActivityBars } from '../../src/components/Charts';
 import { theme, font } from '../../src/theme';
@@ -85,6 +86,17 @@ export default function HomeScreen() {
     return getCore(top[0]) ?? null;
   }, [entries, today]);
 
+  // Most frequent core over the last 7 days — powers the insight card.
+  const weekTopCore = useMemo(() => {
+    const weekAgo = Date.now() - 7 * DAY_MS;
+    const recent7 = entries.filter((e) => e.createdAt >= weekAgo);
+    if (recent7.length === 0) return null;
+    const counts = new Map<string, number>();
+    for (const e of recent7) counts.set(e.coreId, (counts.get(e.coreId) ?? 0) + 1);
+    const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
+    return getCore(top[0]) ?? null;
+  }, [entries]);
+
   const buttonStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const confirmDelete = (entry: FeelingEntry) => {
@@ -154,53 +166,127 @@ export default function HomeScreen() {
               </LinearGradient>
             </AnimatedPressable>
 
-            {/* Stat tiles */}
-            <Animated.View entering={fade(60)} style={styles.statRow}>
-              <View style={styles.statBox}>
-                <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
-                  {t('home.statToday')}
-                </Text>
-                <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
-                  {todayCount}
-                </Text>
-                {dominantCore ? (
-                  <Text style={[styles.statSub, { color: dominantCore.colorMid, fontFamily: font(lang, 'semibold') }]}>
-                    {dominantCore.emoji} {lang === 'ar' ? dominantCore.ar : dominantCore.en}
-                  </Text>
-                ) : (
-                  <Text style={[styles.statSub, { fontFamily: font(lang, 'regular') }]}>—</Text>
-                )}
-              </View>
-              <View style={styles.statBox}>
-                <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
-                  {t('home.statStreak')}
-                </Text>
-                <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
-                  {streak}
-                </Text>
-                <Text style={[styles.statSub, { fontFamily: font(lang, 'regular') }]}>
-                  {t('home.statStreakUnit')}
-                </Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
-                  {t('home.statTotal')}
-                </Text>
-                <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
-                  {entries.length}
-                </Text>
-                <Text style={[styles.statSub, { fontFamily: font(lang, 'regular') }]}>
-                  {t('home.statTotalUnit')}
-                </Text>
+            {/* Quick log — one tap per core feeling */}
+            <Animated.View entering={fade(40)}>
+              <Text style={[styles.quickLabel, { fontFamily: font(lang, 'semibold') }]}>
+                {t('home.quickLog')}
+              </Text>
+              <View style={styles.quickRow}>
+                {FEELINGS_WHEEL.map((c) => (
+                  <Pressable
+                    key={c.id}
+                    style={({ pressed }) => [
+                      styles.quickChip,
+                      { backgroundColor: c.tint, borderColor: pressed ? c.color : theme.colors.border },
+                    ]}
+                    onPress={() => {
+                      haptics.selection();
+                      router.push({ pathname: '/log', params: { coreId: c.id } });
+                    }}
+                  >
+                    <Text style={styles.quickEmoji}>{c.emoji}</Text>
+                    <Text
+                      style={[styles.quickName, { fontFamily: font(lang, 'semibold'), color: c.colorMid }]}
+                      numberOfLines={1}
+                    >
+                      {lang === 'ar' ? c.ar : c.en}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
             </Animated.View>
 
-            {/* 14-day activity */}
-            <Animated.View entering={fade(120)} style={styles.activityCard}>
-              <Text style={[styles.cardLabel, { fontFamily: font(lang, 'semibold') }]}>
-                {t('home.activity')}
-              </Text>
-              <ActivityBars values={activity} color={theme.colors.teal} />
+            {/* Stat tiles → stats tab */}
+            <Animated.View entering={fade(60)} style={styles.statRow}>
+              {[
+                {
+                  label: t('home.statToday'),
+                  value: String(todayCount),
+                  sub: dominantCore
+                    ? `${dominantCore.emoji} ${lang === 'ar' ? dominantCore.ar : dominantCore.en}`
+                    : '—',
+                  subColor: dominantCore?.colorMid,
+                },
+                { label: t('home.statStreak'), value: String(streak), sub: t('home.statStreakUnit') },
+                { label: t('home.statTotal'), value: String(entries.length), sub: t('home.statTotalUnit') },
+              ].map((tile) => (
+                <Pressable
+                  key={tile.label}
+                  style={({ pressed }) => [styles.statBox, pressed && styles.pressedCard]}
+                  onPress={() => {
+                    haptics.selection();
+                    router.push('/stats');
+                  }}
+                >
+                  <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
+                    {tile.label}
+                  </Text>
+                  <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
+                    {tile.value}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.statSub,
+                      { fontFamily: font(lang, 'semibold') },
+                      tile.subColor ? { color: tile.subColor } : null,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {tile.sub}
+                  </Text>
+                </Pressable>
+              ))}
+            </Animated.View>
+
+            {/* Weekly insight → stats */}
+            {weekTopCore ? (
+              <Animated.View entering={fade(90)}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.insightCard,
+                    { borderColor: pressed ? weekTopCore.color : theme.colors.border },
+                  ]}
+                  onPress={() => {
+                    haptics.selection();
+                    router.push('/stats');
+                  }}
+                >
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: weekTopCore.tint, borderRadius: theme.radius.md }]} />
+                  <Text style={styles.insightEmoji}>{weekTopCore.emoji}</Text>
+                  <View style={styles.insightText}>
+                    <Text style={[styles.insightLabel, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('home.insightTitle')}
+                    </Text>
+                    <Text
+                      style={[styles.insightFeeling, { fontFamily: font(lang, 'extrabold'), color: weekTopCore.colorMid }]}
+                    >
+                      {lang === 'ar' ? weekTopCore.ar : weekTopCore.en}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={theme.colors.inkFaint}
+                    style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
+                  />
+                </Pressable>
+              </Animated.View>
+            ) : null}
+
+            {/* 14-day activity → stats */}
+            <Animated.View entering={fade(120)}>
+              <Pressable
+                style={({ pressed }) => [styles.activityCard, pressed && styles.pressedCard]}
+                onPress={() => {
+                  haptics.selection();
+                  router.push('/stats');
+                }}
+              >
+                <Text style={[styles.cardLabel, { fontFamily: font(lang, 'semibold') }]}>
+                  {t('home.activity')}
+                </Text>
+                <ActivityBars values={activity} color={theme.colors.teal} />
+              </Pressable>
             </Animated.View>
 
             {recent.length > 0 ? (
@@ -209,6 +295,17 @@ export default function HomeScreen() {
                 <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
                   {t('home.recent')}
                 </Text>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    haptics.selection();
+                    router.push('/history');
+                  }}
+                >
+                  <Text style={[styles.viewAll, { fontFamily: font(lang, 'bold') }]}>
+                    {t('home.viewAll')}
+                  </Text>
+                </Pressable>
               </View>
             ) : null}
           </View>
@@ -294,6 +391,68 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
   },
+  quickLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.inkFaint,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'left',
+  },
+  quickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  quickEmoji: {
+    fontSize: 15,
+  },
+  quickName: {
+    fontSize: 12,
+  },
+  pressedCard: {
+    opacity: 0.75,
+  },
+  insightCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    backgroundColor: theme.colors.surfaceSolid,
+    overflow: 'hidden',
+  },
+  insightEmoji: {
+    fontSize: 26,
+  },
+  insightText: {
+    flex: 1,
+  },
+  insightLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.inkSoft,
+  },
+  insightFeeling: {
+    fontSize: 18,
+  },
+  viewAll: {
+    fontSize: 12,
+    color: theme.colors.purpleSoft,
+  },
   statRow: {
     flexDirection: 'row',
     gap: 10,
@@ -356,6 +515,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: theme.colors.ink,
     textAlign: 'left',
+    flex: 1,
   },
   emptyWrap: {
     alignItems: 'center',

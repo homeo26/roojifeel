@@ -44,7 +44,7 @@ export default function LogScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const router = useRouter();
-  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { editId, coreId } = useLocalSearchParams<{ editId?: string; coreId?: string }>();
   const editingId = editId ? Number(editId) : null;
 
   const [step, setStep] = useState<Step>(0);
@@ -53,6 +53,17 @@ export default function LogScreen() {
   const [tertiary, setTertiary] = useState<FeelingNode | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Quick-log: a core was chosen on the home screen — skip straight to
+  // the branch step with that core preselected.
+  useEffect(() => {
+    if (editingId != null || !coreId) return;
+    const c = getCore(coreId);
+    if (c) {
+      setCore(c);
+      setStep(1);
+    }
+  }, [coreId, editingId]);
 
   // Edit mode: prefill from the existing entry and jump to the note step.
   // The user can walk back through the steps to change the feeling path.
