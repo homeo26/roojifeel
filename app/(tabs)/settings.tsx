@@ -9,13 +9,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../../src/haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { theme, font } from '../../src/theme';
@@ -39,6 +40,13 @@ export default function SettingsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pendingTime, setPendingTime] = useState<Date>(new Date(2024, 0, 1, 20, 0));
   const [busy, setBusy] = useState(false);
+  const [hapticsOn, setHapticsOn] = useState(haptics.hapticsEnabled());
+
+  const toggleHaptics = async (value: boolean) => {
+    setHapticsOn(value);
+    await haptics.setHapticsEnabled(value);
+    if (value) haptics.selection(); // confirm with a tick only when enabling
+  };
 
   useEffect(() => {
     loadReminders().then(setReminders);
@@ -62,7 +70,7 @@ export default function SettingsScreen() {
       // Android's dialog has its own OK / Cancel — apply on OK.
       setShowTimePicker(false);
       if (event.type !== 'set' || !date) return;
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       persist([...reminders, { hour: date.getHours(), minute: date.getMinutes() }]);
       return;
     }
@@ -71,19 +79,19 @@ export default function SettingsScreen() {
   };
 
   const confirmPendingTime = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     setShowTimePicker(false);
     persist([...reminders, { hour: pendingTime.getHours(), minute: pendingTime.getMinutes() }]);
   };
 
   const removeReminder = (index: number) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     persist(reminders.filter((_, i) => i !== index));
   };
 
   const switchLanguage = async (next: 'en' | 'ar') => {
     if (next === lang) return;
-    Haptics.selectionAsync();
+    haptics.selection();
     await saveLanguage(next);
     await i18n.changeLanguage(next);
     // Layout direction is fully handled in JS (per-screen `direction`
@@ -161,7 +169,7 @@ export default function SettingsScreen() {
           <Pressable
             style={styles.addBtn}
             onPress={() => {
-              Haptics.selectionAsync();
+              haptics.selection();
               setShowTimePicker(true);
             }}
           >
@@ -232,6 +240,30 @@ export default function SettingsScreen() {
               {t('settings.arabic')}
             </Text>
           </Pressable>
+        </View>
+
+        {/* Haptics */}
+        <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
+          {t('settings.haptics')}
+        </Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Ionicons name="radio-outline" size={24} color={theme.colors.accent} />
+            <View style={styles.rowText}>
+              <Text style={[styles.rowTitle, { fontFamily: font(lang, 'bold') }]}>
+                {t('settings.hapticsTitle')}
+              </Text>
+              <Text style={[styles.rowDesc, { fontFamily: font(lang, 'regular') }]}>
+                {t('settings.hapticsDesc')}
+              </Text>
+            </View>
+            <Switch
+              value={hapticsOn}
+              onValueChange={toggleHaptics}
+              trackColor={{ true: theme.colors.purple, false: theme.colors.border }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
         </View>
 
         {/* Data */}

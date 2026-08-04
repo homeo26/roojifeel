@@ -11,7 +11,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../haptics';
 import { theme, font } from '../theme';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -109,13 +109,13 @@ export function TimeRangePicker({ value, onChange }: Props) {
   const dir = lang === 'ar' ? ('rtl' as const) : ('ltr' as const);
 
   const applyQuick = (range: TimeRange) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     onChange(range);
     setOpen(false);
   };
 
   const applyAbsolute = () => {
-    Haptics.selectionAsync();
+    haptics.selection();
     const from = Math.min(absFrom, absTo);
     const to = Math.max(absFrom, absTo);
     onChange({ kind: 'absolute', from, to });
@@ -155,7 +155,7 @@ export function TimeRangePicker({ value, onChange }: Props) {
                   key={m}
                   style={[styles.modeTab, mode === m && styles.modeTabActive]}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    haptics.selection();
                     setMode(m);
                   }}
                 >

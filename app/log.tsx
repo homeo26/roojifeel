@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../src/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -80,7 +80,7 @@ export default function LogScreen() {
   }, [step, core, secondary]);
 
   const pick = (nodeIndex: number) => {
-    Haptics.selectionAsync();
+    haptics.selection();
     if (step === 0) {
       setCore(FEELINGS_WHEEL[nodeIndex]);
       setSecondary(null);
@@ -97,7 +97,7 @@ export default function LogScreen() {
   };
 
   const goBack = () => {
-    Haptics.selectionAsync();
+    haptics.selection();
     if (step === 0) {
       router.back();
     } else {
@@ -122,13 +122,13 @@ export default function LogScreen() {
     } else {
       await addEntry({ ...payload, createdAt: Date.now() });
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     router.back();
   };
 
   const confirmDelete = () => {
     if (editingId == null) return;
-    Haptics.selectionAsync();
+    haptics.selection();
     Alert.alert(t('history.deleteTitle'), t('history.deleteMessage'), [
       { text: t('history.cancel'), style: 'cancel' },
       {
@@ -136,7 +136,7 @@ export default function LogScreen() {
         style: 'destructive',
         onPress: async () => {
           await deleteEntry(editingId);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          haptics.success();
           router.back();
         },
       },

@@ -16,6 +16,7 @@ import {
   IBMPlexSansArabic_700Bold,
 } from '@expo-google-fonts/ibm-plex-sans-arabic';
 import { initI18n, loadSavedLanguage } from '../src/i18n';
+import { loadHapticsPref } from '../src/haptics';
 import { theme } from '../src/theme';
 
 export default function RootLayout() {
@@ -34,6 +35,7 @@ export default function RootLayout() {
     (async () => {
       const lang = await loadSavedLanguage();
       initI18n(lang);
+      await loadHapticsPref();
       // Keep the NATIVE direction pinned to LTR on both platforms.
       // RTL is applied deterministically in JS via per-screen `direction`
       // styles and the custom tab bar, so iOS and Android behave the same

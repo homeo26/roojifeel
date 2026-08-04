@@ -11,7 +11,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../haptics';
 import { theme, font } from '../theme';
 
 /** Minimal structural types — avoids coupling to expo-router's vendored
@@ -60,7 +60,7 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
             key={route.key}
             style={styles.item}
             onPress={() => {
-              Haptics.selectionAsync();
+              haptics.selection();
               const event = navigation.emit({
                 type: 'tabPress',
                 target: route.key,

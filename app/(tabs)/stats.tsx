@@ -10,7 +10,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '../../src/haptics';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { FeelingEntry, getEntriesBetween } from '../../src/db';
 import {
@@ -415,7 +415,7 @@ export default function StatsScreen() {
                 >
                   <Pressable
                     onPress={() => {
-                      Haptics.selectionAsync();
+                      haptics.selection();
                       setExpandedCore(expanded ? null : stat.core.id);
                     }}
                   >
