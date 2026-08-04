@@ -212,8 +212,8 @@ export default function SettingsScreen() {
 
           {showTimePicker ? (
             <Animated.View
-              entering={FadeInDown.duration(220).springify().damping(18)}
-              exiting={FadeOut.duration(120)}
+              entering={FadeInDown.duration(380).springify().damping(20).stiffness(90)}
+              exiting={FadeOut.duration(180)}
               layout={layoutT()}
               style={styles.pickerWrap}
             >
