@@ -1,0 +1,216 @@
+/**
+ * MoodCalendar — a month grid where each day is tinted by the dominant
+ * core feeling logged that day. Swipe months with the chevrons.
+ */
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { FeelingEntry, getEntriesBetween } from '../db';
+import { getCore } from '../data/feelings';
+import { theme, font } from '../theme';
+import * as haptics from '../haptics';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function MoodCalendar() {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
+  const [entries, setEntries] = useState<FeelingEntry[]>([]);
+
+  const monthStart = new Date(year, month, 1).getTime();
+  const monthEnd = new Date(year, month + 1, 1).getTime() - 1;
+
+  useEffect(() => {
+    getEntriesBetween(monthStart, monthEnd).then(setEntries);
+  }, [monthStart, monthEnd]);
+
+  /** Dominant core color per day-of-month. */
+  const dayColors = useMemo(() => {
+    const byDay = new Map<number, Map<string, number>>();
+    for (const e of entries) {
+      const day = new Date(e.createdAt).getDate();
+      let counts = byDay.get(day);
+      if (!counts) {
+        counts = new Map();
+        byDay.set(day, counts);
+      }
+      for (const f of e.feelings) counts.set(f.coreId, (counts.get(f.coreId) ?? 0) + 1);
+    }
+    const result = new Map<number, { color: string; tint: string; emoji: string }>();
+    for (const [day, counts] of byDay) {
+      const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
+      const core = getCore(top[0]);
+      if (core) result.set(day, { color: core.color, tint: core.tint, emoji: core.emoji });
+    }
+    return result;
+  }, [entries]);
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Monday-first offset of the 1st.
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+
+  const weekdayNames = useMemo(() => {
+    const base = new Date(2024, 0, 1); // a Monday
+    return new Array(7).fill(0).map((_, i) =>
+      new Date(base.getTime() + i * DAY_MS).toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
+        weekday: 'narrow',
+      }),
+    );
+  }, [lang]);
+
+  const monthLabel = new Date(year, month, 1).toLocaleDateString(
+    lang === 'ar' ? 'ar' : 'en-GB',
+    { month: 'long', year: 'numeric' },
+  );
+
+  const shift = (delta: number) => {
+    haptics.selection();
+    const d = new Date(year, month + delta, 1);
+    setYear(d.getFullYear());
+    setMonth(d.getMonth());
+  };
+
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+  const cells: Array<number | null> = [
+    ...new Array(firstWeekday).fill(null),
+    ...new Array(daysInMonth).fill(0).map((_, i) => i + 1),
+  ];
+
+  return (
+    <View style={styles.panel}>
+      <View style={styles.headerRow}>
+        <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
+          {t('stats.moodCalendar')}
+        </Text>
+        <View style={styles.navRow}>
+          <Pressable hitSlop={8} onPress={() => shift(-1)}>
+            <Ionicons
+              name="chevron-back"
+              size={18}
+              color={theme.colors.inkSoft}
+              style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
+            />
+          </Pressable>
+          <Text style={[styles.monthLabel, { fontFamily: font(lang, 'bold') }]}>{monthLabel}</Text>
+          <Pressable hitSlop={8} onPress={() => shift(1)} disabled={isCurrentMonth}>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={isCurrentMonth ? theme.colors.border : theme.colors.inkSoft}
+              style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.grid}>
+        {weekdayNames.map((n, i) => (
+          <Text key={`h-${i}`} style={[styles.weekday, { fontFamily: font(lang, 'semibold') }]}>
+            {n}
+          </Text>
+        ))}
+        {cells.map((day, i) => {
+          if (day == null) return <View key={`e-${i}`} style={styles.cell} />;
+          const mood = dayColors.get(day);
+          const isToday = isCurrentMonth && day === now.getDate();
+          return (
+            <View
+              key={`d-${day}`}
+              style={[
+                styles.cell,
+                styles.dayCell,
+                mood ? { backgroundColor: mood.tint, borderColor: mood.color } : null,
+                isToday && styles.today,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dayNum,
+                  { fontFamily: font(lang, 'semibold') },
+                  mood ? { color: theme.colors.ink } : null,
+                ]}
+              >
+                {day}
+              </Text>
+              {mood ? <Text style={styles.dayEmoji}>{mood.emoji}</Text> : null}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  panel: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.sm + 4,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.sm,
+  },
+  panelLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.inkFaint,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  monthLabel: {
+    fontSize: 13,
+    color: theme.colors.ink,
+    minWidth: 110,
+    textAlign: 'center',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  weekday: {
+    width: `${100 / 7}%`,
+    textAlign: 'center',
+    fontSize: 10,
+    color: theme.colors.inkFaint,
+    paddingVertical: 4,
+  },
+  cell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    padding: 2,
+  },
+  dayCell: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 1,
+  },
+  today: {
+    borderWidth: 1.5,
+    borderColor: theme.colors.purpleSoft,
+  },
+  dayNum: {
+    fontSize: 11,
+    color: theme.colors.inkFaint,
+    fontVariant: ['tabular-nums'],
+  },
+  dayEmoji: {
+    fontSize: 12,
+  },
+});

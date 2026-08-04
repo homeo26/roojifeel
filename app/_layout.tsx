@@ -63,6 +63,10 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
+          name="wrapped"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom', animationDuration: 250 }}
+        />
+        <Stack.Screen
           name="log"
           options={{
             presentation: 'modal',

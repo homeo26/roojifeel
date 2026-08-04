@@ -8,7 +8,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as haptics from '../../src/haptics';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -22,6 +22,8 @@ import {
   label,
 } from '../../src/data/feelings';
 import { ActivityBars, Donut, Gauge } from '../../src/components/Charts';
+import { MoodCalendar } from '../../src/components/MoodCalendar';
+import { TrendChart, TrendPoint } from '../../src/components/TrendChart';
 import {
   DEFAULT_RANGE,
   TimeRange,
@@ -82,13 +84,17 @@ function HBar({
 export default function StatsScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
+  const router = useRouter();
   const [range, setRange] = useState<TimeRange>(DEFAULT_RANGE);
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [expandedCore, setExpandedCore] = useState<string | null>(null);
 
+  const [trendEntries, setTrendEntries] = useState<FeelingEntry[]>([]);
+
   const reload = useCallback(() => {
     const { from, to } = resolveRange(range);
     getEntriesBetween(from, to).then(setEntries);
+    getEntriesBetween(Date.now() - 12 * 7 * DAY_MS, Date.now()).then(setTrendEntries);
   }, [range]);
 
   useFocusEffect(
@@ -250,6 +256,42 @@ export default function StatsScreen() {
       .slice(0, 5);
   }, [entries, lang]);
 
+  // Weekly trend series (last 12 weeks, oldest first).
+  const { positivityTrend, intensityTrend } = useMemo(() => {
+    const weeks = 12;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const pos: TrendPoint[] = [];
+    const inten: TrendPoint[] = [];
+    for (let w = weeks - 1; w >= 0; w--) {
+      const to = startOfToday + DAY_MS - w * 7 * DAY_MS;
+      const from = to - 7 * DAY_MS;
+      const bucket = trendEntries.filter((e) => e.createdAt >= from && e.createdAt < to);
+      const labelStr = new Date(from).toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
+        day: 'numeric',
+        month: 'short',
+      });
+      if (bucket.length === 0) {
+        pos.push({ label: labelStr, value: null });
+        inten.push({ label: labelStr, value: null });
+        continue;
+      }
+      const positive = bucket.filter((e) =>
+        e.feelings.some((f) => f.coreId === 'happy' || f.coreId === 'surprised'),
+      ).length;
+      pos.push({ label: labelStr, value: Math.round((positive / bucket.length) * 100) });
+      const withIntensity = bucket.filter((e) => e.intensity != null);
+      inten.push({
+        label: labelStr,
+        value:
+          withIntensity.length > 0
+            ? withIntensity.reduce((a, e) => a + (e.intensity ?? 0), 0) / withIntensity.length
+            : null,
+      });
+    }
+    return { positivityTrend: pos, intensityTrend: inten };
+  }, [trendEntries, lang]);
+
   const maxCount = coreStats[0]?.count ?? 1;
   const todNames = [t('stats.morning'), t('stats.afternoon'), t('stats.evening'), t('stats.night')];
   const todColors = [theme.colors.warning, theme.colors.teal, theme.colors.purple, theme.colors.blue];
@@ -263,7 +305,21 @@ export default function StatsScreen() {
           {t('stats.title')}
         </Text>
 
-        <TimeRangePicker value={range} onChange={setRange} />
+        <View style={styles.toolbar}>
+          <TimeRangePicker value={range} onChange={setRange} />
+          <Pressable
+            style={({ pressed }) => [styles.wrappedBtn, pressed && { opacity: 0.8 }]}
+            onPress={() => {
+              haptics.selection();
+              router.push('/wrapped');
+            }}
+          >
+            <Text style={styles.wrappedEmoji}>✨</Text>
+            <Text style={[styles.wrappedText, { fontFamily: font(lang, 'bold') }]}>
+              {t('stats.wrapped')}
+            </Text>
+          </Pressable>
+        </View>
 
         {total === 0 ? (
           <Animated.View entering={fade()} style={styles.emptyWrap}>
@@ -355,6 +411,37 @@ export default function StatsScreen() {
                   size={132}
                 />
               </View>
+            </Animated.View>
+
+            {/* Mood calendar */}
+            <Animated.View entering={fade(100)}>
+              <MoodCalendar />
+            </Animated.View>
+
+            {/* Trends */}
+            <Animated.View entering={fade(110)} style={styles.panel}>
+              <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
+                {t('stats.trendPositivity')}
+              </Text>
+              <TrendChart
+                points={positivityTrend}
+                max={100}
+                color={theme.colors.pink}
+                format={(v) => `${Math.round(v)}%`}
+                labelFont={font(lang, 'semibold')}
+              />
+            </Animated.View>
+            <Animated.View entering={fade(120)} style={styles.panel}>
+              <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
+                {t('stats.trendIntensity')}
+              </Text>
+              <TrendChart
+                points={intensityTrend}
+                max={5}
+                color={theme.colors.teal}
+                format={(v) => v.toFixed(1)}
+                labelFont={font(lang, 'semibold')}
+              />
             </Animated.View>
 
             {/* Daily activity */}
@@ -532,6 +619,31 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xl * 2,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  wrappedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: 'rgba(236, 72, 153, 0.14)',
+    borderWidth: 1,
+    borderColor: theme.colors.pink,
+  },
+  wrappedEmoji: {
+    fontSize: 13,
+  },
+  wrappedText: {
+    fontSize: 13,
+    color: theme.colors.pinkSoft,
   },
   title: {
     fontSize: 28,
