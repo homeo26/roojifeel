@@ -33,11 +33,13 @@ export function Pressy({ style, scaleTo = 0.95, onPressIn, onPressOut, children,
     <AnimatedPressable
       style={[style, animStyle]}
       onPressIn={(e) => {
-        pressed.value = withTiming(1, { duration: theme.motion.fast, easing: theme.motion.easing });
+        // Snappy in — a quick tap should still visibly dip.
+        pressed.value = withTiming(1, { duration: 80, easing: theme.motion.easing });
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        pressed.value = withTiming(0, { duration: theme.motion.fast, easing: theme.motion.easing });
+        // Smooth out.
+        pressed.value = withTiming(0, { duration: 200, easing: theme.motion.easing });
         onPressOut?.(e);
       }}
       {...rest}

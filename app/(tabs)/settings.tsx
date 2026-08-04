@@ -112,13 +112,18 @@ export default function SettingsScreen() {
     persist(reminders.filter((_, i) => i !== index));
   };
 
-  const switchLanguage = async (next: 'en' | 'ar') => {
+  const switchLanguage = (next: 'en' | 'ar') => {
     if (next === lang) return;
     haptics.selection();
-    await saveLanguage(next);
-    await i18n.changeLanguage(next);
-    // Layout direction is fully handled in JS (per-screen `direction`
-    // styles + custom tab bar) — no native flag, no restart needed.
+    // Let the press animation render before the app-wide re-render that
+    // changeLanguage triggers (it would otherwise freeze the JS thread
+    // mid-animation and make the button feel stuck).
+    setTimeout(async () => {
+      await saveLanguage(next);
+      await i18n.changeLanguage(next);
+      // Layout direction is fully handled in JS (per-screen `direction`
+      // styles + custom tab bar) — no native flag, no restart needed.
+    }, 120);
   };
 
   const onExport = async () => {
@@ -194,7 +199,9 @@ export default function SettingsScreen() {
             scaleTo={0.97}
             onPress={() => {
               haptics.selection();
-              setShowTimePicker(true);
+              // Mounting the native time spinner is heavy — let the press
+              // animation finish first so the button doesn't stutter.
+              setTimeout(() => setShowTimePicker(true), 120);
             }}
           >
             <Ionicons name="add" size={18} color={theme.colors.purpleSoft} />
