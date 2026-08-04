@@ -12,8 +12,10 @@ export default function TabsLayout() {
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        // Animated cross-fade + shift between tabs.
-        animation: 'shift',
+        // Cross-fade between tabs. ('shift' repositions scene containers
+        // and can strand a black scene on top when navigation is triggered
+        // programmatically mid-transition — fade never moves scenes.)
+        animation: 'fade',
         transitionSpec: {
           animation: 'timing',
           config: { duration: theme.motion.base },
