@@ -19,6 +19,7 @@ import { ActivityBars } from '../../src/components/Charts';
 import { theme, font } from '../../src/theme';
 import { isSameDay } from '../../src/timeFormat';
 import { claimMilestone, computeStreak, nextMilestone } from '../../src/streaks';
+import { refreshWidget } from '../../src/widget/RoojifeelWidget';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -37,6 +38,7 @@ export default function HomeScreen() {
       let active = true;
       getAllEntries().then((all) => {
         if (active) setEntries(all);
+        refreshWidget(all, lang).catch(() => {});
       });
       return () => {
         active = false;

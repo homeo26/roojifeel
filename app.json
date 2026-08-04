@@ -68,6 +68,23 @@
         {
           "photosPermission": "Roojifeel needs photo access so you can attach a picture to a feeling."
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Roojifeel",
+              "label": "Roojifeel",
+              "description": "Today's mood and one-tap feeling log",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
       ]
     ],
     "owner": "homeo26s-team"

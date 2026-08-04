@@ -41,9 +41,10 @@ import {
   getTertiary,
   label,
 } from '../src/data/feelings';
-import { FeelingPath, addEntry, deleteEntry, getAllTags, getEntry, updateEntry } from '../src/db';
+import { FeelingPath, addEntry, deleteEntry, getAllEntries, getAllTags, getEntry, updateEntry } from '../src/db';
 import { deleteAttachment, isPersisted, persistAttachment } from '../src/attachments';
 import { syncSmartReminders } from '../src/notifications';
+import { refreshWidget } from '../src/widget/RoojifeelWidget';
 import { theme, font } from '../src/theme';
 
 type Step = 0 | 1 | 2 | 3;
@@ -227,6 +228,7 @@ export default function LogScreen() {
       nudgeTitle: t('settings.nudgeTitle'),
       nudgeBody: t('settings.nudgeBody'),
     }).catch(() => {});
+    getAllEntries().then((all) => refreshWidget(all, lang)).catch(() => {});
     router.back();
   };
 
