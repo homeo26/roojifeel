@@ -1,7 +1,9 @@
 /**
- * Stats — Kibana-style dashboard over a configurable time range (default 14 days).
- * Donut of core distribution, gauges for check-in consistency and positivity,
- * daily activity bars, expandable branch-level breakdowns, top feelings.
+ * Stats — Kibana-style dashboard over a flexible time range.
+ * Range: quick presets or absolute from/to dates (TimeRangePicker).
+ * Panels: summary tiles, core distribution donut, consistency & positivity
+ * gauges, daily activity, time-of-day and weekday breakdowns, per-core
+ * branch drill-down, top feelings.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -20,11 +22,16 @@ import {
   label,
 } from '../../src/data/feelings';
 import { ActivityBars, Donut, Gauge } from '../../src/components/Charts';
+import {
+  DEFAULT_RANGE,
+  TimeRange,
+  TimeRangePicker,
+  rangeDayCount,
+  resolveRange,
+} from '../../src/components/TimeRangePicker';
 import { theme, font } from '../../src/theme';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const RANGES = [7, 14, 30, 90] as const;
-const DEFAULT_RANGE = 14;
 const fade = (delay = 0) => FadeIn.duration(theme.motion.base).delay(delay);
 const layoutT = () => LinearTransition.duration(theme.motion.fast);
 
@@ -40,18 +47,49 @@ interface CoreStat {
   }>;
 }
 
+/** Simple labeled horizontal bar row. */
+function HBar({
+  name,
+  count,
+  max,
+  color,
+  fontFamily,
+}: {
+  name: string;
+  count: number;
+  max: number;
+  color: string;
+  fontFamily: string;
+}) {
+  return (
+    <View style={styles.hbarRow}>
+      <Text style={[styles.hbarName, { fontFamily }]} numberOfLines={1}>
+        {name}
+      </Text>
+      <View style={styles.hbarTrack}>
+        <View
+          style={[
+            styles.hbarFill,
+            { backgroundColor: color, width: `${max > 0 ? Math.max((count / max) * 100, count > 0 ? 4 : 0) : 0}%` },
+          ]}
+        />
+      </View>
+      <Text style={[styles.hbarCount, { fontFamily }]}>{count}</Text>
+    </View>
+  );
+}
+
 export default function StatsScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const [rangeDays, setRangeDays] = useState<number>(DEFAULT_RANGE);
+  const [range, setRange] = useState<TimeRange>(DEFAULT_RANGE);
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [expandedCore, setExpandedCore] = useState<string | null>(null);
 
   const reload = useCallback(() => {
-    const to = Date.now();
-    const from = to - rangeDays * DAY_MS;
+    const { from, to } = resolveRange(range);
     getEntriesBetween(from, to).then(setEntries);
-  }, [rangeDays]);
+  }, [range]);
 
   useFocusEffect(
     useCallback(() => {
@@ -60,6 +98,16 @@ export default function StatsScreen() {
   );
 
   const total = entries.length;
+
+  // Effective day count: for "all time", measure from the first entry.
+  const effectiveDays = useMemo(() => {
+    if (range.kind === 'all') {
+      if (entries.length === 0) return 1;
+      const first = Math.min(...entries.map((e) => e.createdAt));
+      return Math.max(1, Math.ceil((Date.now() - first) / DAY_MS));
+    }
+    return rangeDayCount(range);
+  }, [range, entries]);
 
   const coreStats: CoreStat[] = useMemo(() => {
     const stats: CoreStat[] = [];
@@ -115,16 +163,25 @@ export default function StatsScreen() {
     return days.size;
   }, [entries]);
 
-  // Positivity: share of Happy + Surprised check-ins.
   const positivity = useMemo(() => {
     if (total === 0) return 0;
     const positive = entries.filter((e) => e.coreId === 'happy' || e.coreId === 'surprised').length;
     return positive / total;
   }, [entries, total]);
 
-  // Daily activity, oldest first.
+  const withNotesPct = useMemo(() => {
+    if (total === 0) return 0;
+    return Math.round((entries.filter((e) => e.note != null).length / total) * 100);
+  }, [entries, total]);
+
+  const avgPerDay = useMemo(() => {
+    if (daysWithCheckin === 0) return '0';
+    return (total / effectiveDays).toFixed(1);
+  }, [total, effectiveDays, daysWithCheckin]);
+
+  // Daily activity, oldest first (capped at 30 bars).
   const activity = useMemo(() => {
-    const buckets = new Array(Math.min(rangeDays, 30)).fill(0) as number[];
+    const buckets = new Array(Math.min(effectiveDays, 30)).fill(0) as number[];
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     for (const e of entries) {
@@ -132,7 +189,39 @@ export default function StatsScreen() {
       if (diffDays >= 0 && diffDays < buckets.length) buckets[buckets.length - 1 - diffDays] += 1;
     }
     return buckets;
-  }, [entries, rangeDays]);
+  }, [entries, effectiveDays]);
+
+  // Time-of-day buckets.
+  const timeOfDay = useMemo(() => {
+    const buckets = [0, 0, 0, 0]; // morning, afternoon, evening, night
+    for (const e of entries) {
+      const h = new Date(e.createdAt).getHours();
+      if (h >= 6 && h < 12) buckets[0] += 1;
+      else if (h >= 12 && h < 17) buckets[1] += 1;
+      else if (h >= 17 && h < 22) buckets[2] += 1;
+      else buckets[3] += 1;
+    }
+    return buckets;
+  }, [entries]);
+
+  // Weekday breakdown, Monday-first.
+  const weekdays = useMemo(() => {
+    const buckets = new Array(7).fill(0) as number[];
+    for (const e of entries) {
+      const jsDay = new Date(e.createdAt).getDay(); // 0=Sun
+      buckets[(jsDay + 6) % 7] += 1;
+    }
+    return buckets;
+  }, [entries]);
+
+  const weekdayNames = useMemo(() => {
+    // Monday-first localized short names (Mon 2024-01-01).
+    const base = new Date(2024, 0, 1);
+    return new Array(7).fill(0).map((_, i) => {
+      const d = new Date(base.getTime() + i * DAY_MS);
+      return d.toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', { weekday: 'short' });
+    });
+  }, [lang]);
 
   const topFeelings = useMemo(() => {
     const counts = new Map<string, { name: string; color: string; count: number }>();
@@ -156,6 +245,10 @@ export default function StatsScreen() {
   }, [entries, lang]);
 
   const maxCount = coreStats[0]?.count ?? 1;
+  const todNames = [t('stats.morning'), t('stats.afternoon'), t('stats.evening'), t('stats.night')];
+  const todColors = [theme.colors.warning, theme.colors.teal, theme.colors.purple, theme.colors.blue];
+  const maxTod = Math.max(...timeOfDay, 1);
+  const maxWd = Math.max(...weekdays, 1);
 
   return (
     <SafeAreaView style={[styles.safe, { direction: lang === 'ar' ? 'rtl' : 'ltr' }]} edges={['top']}>
@@ -164,33 +257,7 @@ export default function StatsScreen() {
           {t('stats.title')}
         </Text>
 
-        {/* Range selector */}
-        <View style={styles.rangeRow}>
-          {RANGES.map((days) => {
-            const active = rangeDays === days;
-            return (
-              <Pressable
-                key={days}
-                style={[styles.rangeChip, active && styles.rangeChipActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setRangeDays(days);
-                  setExpandedCore(null);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.rangeChipText,
-                    { fontFamily: font(lang, 'semibold') },
-                    active && styles.rangeChipTextActive,
-                  ]}
-                >
-                  {t('stats.days', { count: days })}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <TimeRangePicker value={range} onChange={setRange} />
 
         {total === 0 ? (
           <Animated.View entering={fade()} style={styles.emptyWrap}>
@@ -201,8 +268,27 @@ export default function StatsScreen() {
           </Animated.View>
         ) : (
           <>
+            {/* Summary tiles */}
+            <Animated.View entering={fade()} style={styles.tileRow}>
+              {[
+                { label: t('stats.tileTotal'), value: String(total) },
+                { label: t('stats.tileDaysLogged'), value: `${daysWithCheckin}/${effectiveDays}` },
+                { label: t('stats.tileAvgPerDay'), value: avgPerDay },
+                { label: t('stats.tileWithNotes'), value: `${withNotesPct}%` },
+              ].map((tile) => (
+                <View key={tile.label} style={styles.tile}>
+                  <Text style={[styles.tileValue, { fontFamily: font(lang, 'extrabold') }]}>
+                    {tile.value}
+                  </Text>
+                  <Text style={[styles.tileLabel, { fontFamily: font(lang, 'semibold') }]}>
+                    {tile.label}
+                  </Text>
+                </View>
+              ))}
+            </Animated.View>
+
             {/* Donut + legend */}
-            <Animated.View entering={fade()} style={styles.panel}>
+            <Animated.View entering={fade(40)} style={styles.panel}>
               <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
                 {t('stats.coreBreakdown')}
               </Text>
@@ -234,15 +320,15 @@ export default function StatsScreen() {
             </Animated.View>
 
             {/* Gauges */}
-            <Animated.View entering={fade(50)} style={styles.gaugeRow}>
+            <Animated.View entering={fade(80)} style={styles.gaugeRow}>
               <View style={[styles.panel, styles.gaugePanel]}>
                 <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
                   {t('stats.gaugeConsistency')}
                 </Text>
                 <Gauge
-                  value={daysWithCheckin / rangeDays}
+                  value={daysWithCheckin / effectiveDays}
                   color={theme.colors.teal}
-                  label={`${daysWithCheckin}/${rangeDays}`}
+                  label={`${daysWithCheckin}/${effectiveDays}`}
                   caption={t('stats.gaugeDays')}
                   labelFont={font(lang, 'extrabold')}
                   captionFont={font(lang, 'semibold')}
@@ -266,11 +352,45 @@ export default function StatsScreen() {
             </Animated.View>
 
             {/* Daily activity */}
-            <Animated.View entering={fade(100)} style={styles.panel}>
+            <Animated.View entering={fade(120)} style={styles.panel}>
               <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
                 {t('stats.activityLabel', { count: activity.length })}
               </Text>
               <ActivityBars values={activity} color={theme.colors.purple} height={64} />
+            </Animated.View>
+
+            {/* Time of day */}
+            <Animated.View entering={fade(160)} style={styles.panel}>
+              <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
+                {t('stats.byTimeOfDay')}
+              </Text>
+              {todNames.map((name, i) => (
+                <HBar
+                  key={name}
+                  name={name}
+                  count={timeOfDay[i]}
+                  max={maxTod}
+                  color={todColors[i]}
+                  fontFamily={font(lang, 'semibold')}
+                />
+              ))}
+            </Animated.View>
+
+            {/* Weekdays */}
+            <Animated.View entering={fade(200)} style={styles.panel}>
+              <Text style={[styles.panelLabel, { fontFamily: font(lang, 'semibold') }]}>
+                {t('stats.byWeekday')}
+              </Text>
+              {weekdayNames.map((name, i) => (
+                <HBar
+                  key={name}
+                  name={name}
+                  count={weekdays[i]}
+                  max={maxWd}
+                  color={theme.colors.tealSoft}
+                  fontFamily={font(lang, 'semibold')}
+                />
+              ))}
             </Animated.View>
 
             {/* Core breakdown */}
@@ -336,7 +456,11 @@ export default function StatsScreen() {
 
                   {expanded
                     ? stat.secondaries.map((sec) => (
-                        <Animated.View key={sec.id} entering={FadeIn.duration(theme.motion.fast)} style={styles.branch}>
+                        <Animated.View
+                          key={sec.id}
+                          entering={FadeIn.duration(theme.motion.fast)}
+                          style={styles.branch}
+                        >
                           <View style={styles.branchRow}>
                             <Text
                               style={[
@@ -411,30 +535,33 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     textAlign: 'left',
   },
-  rangeRow: {
+  tileRow: {
     flexDirection: 'row',
     gap: 8,
-    flexWrap: 'wrap',
-    marginBottom: theme.spacing.md,
+    marginTop: theme.spacing.md,
   },
-  rangeChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
+  tile: {
+    flex: 1,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    gap: 2,
   },
-  rangeChipActive: {
-    backgroundColor: 'rgba(124, 58, 237, 0.18)',
-    borderColor: theme.colors.purple,
+  tileValue: {
+    fontSize: 17,
+    color: theme.colors.ink,
+    fontVariant: ['tabular-nums'],
   },
-  rangeChipText: {
-    fontSize: 13,
-    color: theme.colors.inkSoft,
-  },
-  rangeChipTextActive: {
-    color: theme.colors.purpleSoft,
+  tileLabel: {
+    fontSize: 8.5,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: theme.colors.inkFaint,
+    textAlign: 'center',
   },
   panel: {
     backgroundColor: theme.colors.surface,
@@ -442,7 +569,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm + 4,
+    marginTop: theme.spacing.sm + 4,
   },
   panelLabel: {
     fontSize: 10,
@@ -484,10 +611,42 @@ const styles = StyleSheet.create({
   gaugeRow: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: theme.spacing.sm + 4,
   },
   gaugePanel: {
     flex: 1,
     alignItems: 'center',
+    marginTop: 0,
+  },
+  hbarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 5,
+  },
+  hbarName: {
+    width: 76,
+    fontSize: 12,
+    color: theme.colors.inkSoft,
+    textAlign: 'left',
+  },
+  hbarTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+  },
+  hbarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  hbarCount: {
+    minWidth: 26,
+    fontSize: 12,
+    color: theme.colors.ink,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'right',
   },
   emptyWrap: {
     alignItems: 'center',

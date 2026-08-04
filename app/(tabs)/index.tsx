@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { FeelingEntry, getAllEntries } from '../../src/db';
+import { FeelingEntry, deleteEntry, getAllEntries } from '../../src/db';
 import { getCore } from '../../src/data/feelings';
 import { EntryCard } from '../../src/components/EntryCard';
 import { ActivityBars } from '../../src/components/Charts';
@@ -86,6 +86,21 @@ export default function HomeScreen() {
   }, [entries, today]);
 
   const buttonStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const confirmDelete = (entry: FeelingEntry) => {
+    Alert.alert(t('history.deleteTitle'), t('history.deleteMessage'), [
+      { text: t('history.cancel'), style: 'cancel' },
+      {
+        text: t('history.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          await deleteEntry(entry.id);
+          const all = await getAllEntries();
+          setEntries(all);
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { direction: lang === 'ar' ? 'rtl' : 'ltr' }]} edges={['top']}>
@@ -206,7 +221,9 @@ export default function HomeScreen() {
             </Text>
           </Animated.View>
         }
-        renderItem={({ item, index }) => <EntryCard entry={item} index={index} />}
+        renderItem={({ item, index }) => (
+          <EntryCard entry={item} index={index} onLongPress={() => confirmDelete(item)} />
+        )}
       />
     </SafeAreaView>
   );

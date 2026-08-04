@@ -1,84 +1,84 @@
 /**
- * Settings — daily reminder, language (EN/AR with RTL), and data import/export.
+ * Settings — multiple daily reminders at exact times, language (EN/AR
+ * with instant RTL), and data import/export.
  */
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  I18nManager,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { theme, font } from '../../src/theme';
 import { saveLanguage } from '../../src/i18n';
 import {
-  cancelReminders,
-  loadReminderPrefs,
+  ReminderTime,
+  applyReminders,
+  loadReminders,
+  normalizeReminders,
   requestNotificationPermission,
-  saveReminderPrefs,
-  scheduleDailyReminder,
 } from '../../src/notifications';
 import { exportHistory, importHistory } from '../../src/exportImport';
+
+const layoutT = () => LinearTransition.duration(theme.motion.fast);
 
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
 
-  const [reminderEnabled, setReminderEnabled] = useState(false);
-  const [hour, setHour] = useState(20);
-  const [minute, setMinute] = useState(0);
+  const [reminders, setReminders] = useState<ReminderTime[]>([]);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pendingTime, setPendingTime] = useState<Date>(new Date(2024, 0, 1, 20, 0));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    loadReminderPrefs().then((prefs) => {
-      setReminderEnabled(prefs.enabled);
-      setHour(prefs.hour);
-      setMinute(prefs.minute);
-    });
+    loadReminders().then(setReminders);
   }, []);
 
-  const applyReminder = async (enabled: boolean, h: number, m: number) => {
-    if (enabled) {
+  const persist = async (next: ReminderTime[]) => {
+    const normalized = normalizeReminders(next);
+    setReminders(normalized);
+    if (normalized.length > 0) {
       const granted = await requestNotificationPermission();
       if (!granted) {
         Alert.alert(t('settings.permissionDenied'));
-        setReminderEnabled(false);
-        await saveReminderPrefs({ enabled: false, hour: h, minute: m });
         return;
       }
-      await scheduleDailyReminder(h, m, t('settings.notifTitle'), t('settings.notifBody'));
-    } else {
-      await cancelReminders();
     }
-    await saveReminderPrefs({ enabled, hour: h, minute: m });
+    await applyReminders(normalized, t('settings.notifTitle'), t('settings.notifBody'));
   };
 
-  const toggleReminder = async (value: boolean) => {
-    Haptics.selectionAsync();
-    setReminderEnabled(value);
-    await applyReminder(value, hour, minute);
+  const onTimePicked = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      // Android's dialog has its own OK / Cancel — apply on OK.
+      setShowTimePicker(false);
+      if (event.type !== 'set' || !date) return;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      persist([...reminders, { hour: date.getHours(), minute: date.getMinutes() }]);
+      return;
+    }
+    // iOS spinner fires on every wheel move — just track the pending value.
+    if (date) setPendingTime(date);
   };
 
-  const shiftTime = async (deltaMinutes: number) => {
+  const confirmPendingTime = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowTimePicker(false);
+    persist([...reminders, { hour: pendingTime.getHours(), minute: pendingTime.getMinutes() }]);
+  };
+
+  const removeReminder = (index: number) => {
     Haptics.selectionAsync();
-    let totalMinutes = hour * 60 + minute + deltaMinutes;
-    totalMinutes = ((totalMinutes % 1440) + 1440) % 1440;
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    setHour(h);
-    setMinute(m);
-    if (reminderEnabled) {
-      await applyReminder(true, h, m);
-    } else {
-      await saveReminderPrefs({ enabled: false, hour: h, minute: m });
-    }
+    persist(reminders.filter((_, i) => i !== index));
   };
 
   const switchLanguage = async (next: 'en' | 'ar') => {
@@ -86,13 +86,8 @@ export default function SettingsScreen() {
     Haptics.selectionAsync();
     await saveLanguage(next);
     await i18n.changeLanguage(next);
-    // Layout direction is applied instantly via the per-screen `direction`
-    // style; keep the native flag in sync for the next cold start.
-    const wantRTL = next === 'ar';
-    if (I18nManager.isRTL !== wantRTL) {
-      I18nManager.allowRTL(wantRTL);
-      I18nManager.forceRTL(wantRTL);
-    }
+    // Layout direction is fully handled in JS (per-screen `direction`
+    // styles + custom tab bar) — no native flag, no restart needed.
   };
 
   const onExport = async () => {
@@ -121,7 +116,8 @@ export default function SettingsScreen() {
     }
   };
 
-  const timeLabel = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const fmtTime = (r: ReminderTime) =>
+    `${String(r.hour).padStart(2, '0')}:${String(r.minute).padStart(2, '0')}`;
 
   return (
     <SafeAreaView style={[styles.safe, { direction: lang === 'ar' ? 'rtl' : 'ltr' }]} edges={['top']}>
@@ -130,44 +126,78 @@ export default function SettingsScreen() {
           {t('settings.title')}
         </Text>
 
-        {/* Reminder */}
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={styles.rowText}>
-              <Text style={[styles.rowTitle, { fontFamily: font(lang, 'bold') }]}>
-                {t('settings.reminders')}
-              </Text>
-              <Text style={[styles.rowDesc, { fontFamily: font(lang, 'regular') }]}>
-                {t('settings.remindersDesc')}
-              </Text>
-            </View>
-            <Switch
-              value={reminderEnabled}
-              onValueChange={toggleReminder}
-              trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
+        {/* Reminders */}
+        <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
+          {t('settings.reminders')}
+        </Text>
+        <Text style={[styles.sectionDesc, { fontFamily: font(lang, 'regular') }]}>
+          {t('settings.remindersDesc')}
+        </Text>
 
-          {reminderEnabled ? (
-            <View style={[styles.row, styles.timeRow]}>
-              <Text style={[styles.rowTitle, { fontFamily: font(lang, 'semibold') }]}>
-                {t('settings.reminderTime')}
-              </Text>
-              <View style={styles.timeControls}>
-                <Pressable style={styles.timeBtn} onPress={() => shiftTime(-30)} hitSlop={8}>
-                  <Ionicons name="remove" size={20} color={theme.colors.accent} />
-                </Pressable>
-                <Text style={[styles.timeText, { fontFamily: font(lang, 'extrabold') }]}>
-                  {timeLabel}
+        <Animated.View layout={layoutT()} style={styles.card}>
+          {reminders.length === 0 ? (
+            <Text style={[styles.noReminders, { fontFamily: font(lang, 'regular') }]}>
+              {t('settings.noReminders')}
+            </Text>
+          ) : (
+            reminders.map((r, i) => (
+              <Animated.View
+                key={`${r.hour}-${r.minute}`}
+                entering={FadeIn.duration(theme.motion.fast)}
+                layout={layoutT()}
+                style={[styles.reminderRow, i > 0 && styles.reminderRowBorder]}
+              >
+                <Ionicons name="alarm-outline" size={18} color={theme.colors.tealSoft} />
+                <Text style={[styles.reminderTime, { fontFamily: font(lang, 'bold') }]}>
+                  {fmtTime(r)}
                 </Text>
-                <Pressable style={styles.timeBtn} onPress={() => shiftTime(30)} hitSlop={8}>
-                  <Ionicons name="add" size={20} color={theme.colors.accent} />
+                <Pressable hitSlop={10} onPress={() => removeReminder(i)}>
+                  <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
                 </Pressable>
-              </View>
+              </Animated.View>
+            ))
+          )}
+
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setShowTimePicker(true);
+            }}
+          >
+            <Ionicons name="add" size={18} color={theme.colors.purpleSoft} />
+            <Text style={[styles.addBtnText, { fontFamily: font(lang, 'bold') }]}>
+              {t('settings.addReminder')}
+            </Text>
+          </Pressable>
+
+          {showTimePicker ? (
+            <View style={styles.pickerWrap}>
+              <DateTimePicker
+                value={Platform.OS === 'ios' ? pendingTime : new Date(2024, 0, 1, 20, 0)}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                themeVariant="dark"
+                onChange={onTimePicked}
+              />
+              {Platform.OS === 'ios' ? (
+                <View style={styles.pickerActions}>
+                  <Pressable style={styles.pickerCancel} onPress={() => setShowTimePicker(false)}>
+                    <Text style={[styles.pickerCancelText, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('history.cancel')}
+                    </Text>
+                  </Pressable>
+                  <Pressable style={styles.pickerApply} onPress={confirmPendingTime}>
+                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    <Text style={[styles.pickerApplyText, { fontFamily: font(lang, 'bold') }]}>
+                      {t('range.apply')}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
           ) : null}
-        </View>
+        </Animated.View>
 
         {/* Language */}
         <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
@@ -256,8 +286,21 @@ const styles = StyleSheet.create({
     fontSize: 28,
     letterSpacing: -0.6,
     color: theme.colors.ink,
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'left',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    color: theme.colors.ink,
+    marginTop: theme.spacing.lg,
+    marginBottom: 2,
+    textAlign: 'left',
+  },
+  sectionDesc: {
+    fontSize: 12,
+    color: theme.colors.inkFaint,
+    marginBottom: theme.spacing.sm,
     textAlign: 'left',
   },
   card: {
@@ -267,7 +310,77 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm + 4,
-    ...theme.shadow.card,
+    marginTop: theme.spacing.sm,
+  },
+  noReminders: {
+    fontSize: 13,
+    color: theme.colors.inkFaint,
+    textAlign: 'center',
+    paddingVertical: theme.spacing.sm,
+  },
+  reminderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+  },
+  reminderRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  reminderTime: {
+    flex: 1,
+    fontSize: 17,
+    color: theme.colors.ink,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'left',
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: theme.spacing.sm,
+    paddingVertical: 11,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: theme.colors.borderBright,
+  },
+  addBtnText: {
+    fontSize: 14,
+    color: theme.colors.purpleSoft,
+  },
+  pickerWrap: {
+    marginTop: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  pickerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 4,
+  },
+  pickerCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  pickerCancelText: {
+    fontSize: 13,
+    color: theme.colors.inkSoft,
+  },
+  pickerApply: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.purple,
+  },
+  pickerApplyText: {
+    fontSize: 13,
+    color: '#FFFFFF',
   },
   row: {
     flexDirection: 'row',
@@ -288,44 +401,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'left',
   },
-  timeRow: {
-    marginTop: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    justifyContent: 'space-between',
-  },
-  timeControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  timeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: theme.colors.surfaceHover,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timeText: {
-    fontSize: 18,
-    color: theme.colors.ink,
-    minWidth: 64,
-    textAlign: 'center',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    color: theme.colors.ink,
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.sm + 4,
-    textAlign: 'left',
-  },
   langRow: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: theme.spacing.sm,
   },
   langChip: {
     flex: 1,
@@ -337,15 +416,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   langChipActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    borderColor: theme.colors.purple,
   },
   langText: {
     fontSize: 15,
     color: theme.colors.inkSoft,
   },
   langTextActive: {
-    color: '#FFFFFF',
+    color: theme.colors.purpleSoft,
   },
   about: {
     marginTop: theme.spacing.xl,

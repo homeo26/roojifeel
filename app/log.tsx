@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -30,7 +31,7 @@ import {
   getTertiary,
   label,
 } from '../src/data/feelings';
-import { addEntry, getEntry, updateEntry } from '../src/db';
+import { addEntry, deleteEntry, getEntry, updateEntry } from '../src/db';
 import { theme, font } from '../src/theme';
 
 type Step = 0 | 1 | 2 | 3;
@@ -123,6 +124,23 @@ export default function LogScreen() {
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
+  };
+
+  const confirmDelete = () => {
+    if (editingId == null) return;
+    Haptics.selectionAsync();
+    Alert.alert(t('history.deleteTitle'), t('history.deleteMessage'), [
+      { text: t('history.cancel'), style: 'cancel' },
+      {
+        text: t('history.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          await deleteEntry(editingId);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          router.back();
+        },
+      },
+    ]);
   };
 
   /** The traversal trail: [core, secondary, tertiary] as far as chosen. */
@@ -282,6 +300,17 @@ export default function LogScreen() {
                 </LinearGradient>
               )}
             </Pressable>
+            {editingId != null ? (
+              <Pressable
+                style={({ pressed }) => [styles.deleteBtn, pressed && styles.optionPressed]}
+                onPress={confirmDelete}
+              >
+                <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
+                <Text style={[styles.deleteText, { fontFamily: font(lang, 'bold') }]}>
+                  {t('log.delete')}
+                </Text>
+              </Pressable>
+            ) : null}
           </Animated.View>
         )}
       </KeyboardAvoidingView>
@@ -417,5 +446,21 @@ const styles = StyleSheet.create({
   saveText: {
     color: '#FFFFFF',
     fontSize: 16,
+  },
+  deleteBtn: {
+    marginTop: theme.spacing.sm + 4,
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  deleteText: {
+    color: theme.colors.danger,
+    fontSize: 15,
   },
 });

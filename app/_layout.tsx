@@ -34,13 +34,13 @@ export default function RootLayout() {
     (async () => {
       const lang = await loadSavedLanguage();
       initI18n(lang);
-      // Align native layout direction with the language.
-      const wantRTL = lang === 'ar';
-      if (I18nManager.isRTL !== wantRTL) {
-        I18nManager.allowRTL(wantRTL);
-        I18nManager.forceRTL(wantRTL);
-        // Direction fully applies after next app restart; JS-side styles
-        // (textAlign, logical margins) still follow immediately.
+      // Keep the NATIVE direction pinned to LTR on both platforms.
+      // RTL is applied deterministically in JS via per-screen `direction`
+      // styles and the custom tab bar, so iOS and Android behave the same
+      // and language switches apply instantly without a restart.
+      if (I18nManager.isRTL) {
+        I18nManager.allowRTL(false);
+        I18nManager.forceRTL(false);
       }
       setI18nReady(true);
     })();

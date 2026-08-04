@@ -1,17 +1,18 @@
 /**
- * Daily "What are you feeling right now?" reminder via local notifications.
+ * Daily "What are you feeling right now?" reminders via local notifications.
+ * Supports MULTIPLE reminders per day, each at an exact hour:minute.
  * Everything is on-device; no push server involved.
  */
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export const REMINDER_ENABLED_KEY = 'roojifeel.reminder.enabled';
-export const REMINDER_HOUR_KEY = 'roojifeel.reminder.hour';
-export const REMINDER_MINUTE_KEY = 'roojifeel.reminder.minute';
+const REMINDERS_KEY = 'roojifeel.reminders.v2';
 
-export const DEFAULT_REMINDER_HOUR = 20;
-export const DEFAULT_REMINDER_MINUTE = 0;
+export interface ReminderTime {
+  hour: number;
+  minute: number;
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -35,51 +36,54 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return request.granted;
 }
 
-export async function scheduleDailyReminder(
-  hour: number,
-  minute: number,
+/** Persist the reminder list and (re)schedule a daily notification per time. */
+export async function applyReminders(
+  reminders: ReminderTime[],
   title: string,
   body: string,
 ): Promise<void> {
+  await AsyncStorage.setItem(REMINDERS_KEY, JSON.stringify(reminders));
   await Notifications.cancelAllScheduledNotificationsAsync();
-  await Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: false },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-      channelId: Platform.OS === 'android' ? 'reminders' : undefined,
-    },
-  });
+  for (const r of reminders) {
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: false },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: r.hour,
+        minute: r.minute,
+        channelId: Platform.OS === 'android' ? 'reminders' : undefined,
+      },
+    });
+  }
 }
 
-export async function cancelReminders(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+export async function loadReminders(): Promise<ReminderTime[]> {
+  try {
+    const raw = await AsyncStorage.getItem(REMINDERS_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r): r is ReminderTime =>
+        typeof r === 'object' &&
+        r !== null &&
+        typeof (r as ReminderTime).hour === 'number' &&
+        typeof (r as ReminderTime).minute === 'number',
+    );
+  } catch {
+    return [];
+  }
 }
 
-export interface ReminderPrefs {
-  enabled: boolean;
-  hour: number;
-  minute: number;
-}
-
-export async function loadReminderPrefs(): Promise<ReminderPrefs> {
-  const [enabled, hour, minute] = await Promise.all([
-    AsyncStorage.getItem(REMINDER_ENABLED_KEY),
-    AsyncStorage.getItem(REMINDER_HOUR_KEY),
-    AsyncStorage.getItem(REMINDER_MINUTE_KEY),
-  ]);
-  return {
-    enabled: enabled === 'true',
-    hour: hour != null ? Number(hour) : DEFAULT_REMINDER_HOUR,
-    minute: minute != null ? Number(minute) : DEFAULT_REMINDER_MINUTE,
-  };
-}
-
-export async function saveReminderPrefs(prefs: ReminderPrefs): Promise<void> {
-  await Promise.all([
-    AsyncStorage.setItem(REMINDER_ENABLED_KEY, String(prefs.enabled)),
-    AsyncStorage.setItem(REMINDER_HOUR_KEY, String(prefs.hour)),
-    AsyncStorage.setItem(REMINDER_MINUTE_KEY, String(prefs.minute)),
-  ]);
+/** Sort chronologically and drop duplicates. */
+export function normalizeReminders(reminders: ReminderTime[]): ReminderTime[] {
+  const seen = new Set<string>();
+  return [...reminders]
+    .sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))
+    .filter((r) => {
+      const key = `${r.hour}:${r.minute}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
