@@ -178,13 +178,33 @@ export default function LogScreen() {
     setTagInput('');
   };
 
-  const pickPhoto = async () => {
+  const pickPhoto = () => {
     haptics.selection();
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-    if (!res.canceled && res.assets[0]) setPhotoUri(res.assets[0].uri);
+    Alert.alert(t('log.photoSourceTitle'), undefined, [
+      {
+        text: t('log.photoCamera'),
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert(t('log.cameraDenied'));
+            return;
+          }
+          const res = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+          if (!res.canceled && res.assets[0]) setPhotoUri(res.assets[0].uri);
+        },
+      },
+      {
+        text: t('log.photoLibrary'),
+        onPress: async () => {
+          const res = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+          });
+          if (!res.canceled && res.assets[0]) setPhotoUri(res.assets[0].uri);
+        },
+      },
+      { text: t('history.cancel'), style: 'cancel' },
+    ]);
   };
 
   const toggleRecording = async () => {

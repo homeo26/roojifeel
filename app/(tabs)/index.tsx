@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,6 @@ import { FeelingEntry, deleteEntry, getAllEntries } from '../../src/db';
 import { FEELINGS_WHEEL, getCore } from '../../src/data/feelings';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EntryCard } from '../../src/components/EntryCard';
-import { ActivityBars } from '../../src/components/Charts';
 import { theme, font, displayFont } from '../../src/theme';
 import { isSameDay } from '../../src/timeFormat';
 import { claimMilestone, computeStreak, nextMilestone } from '../../src/streaks';
@@ -69,16 +68,38 @@ export default function HomeScreen() {
     });
   }, [streak]);
 
-  // Last 14 days of activity, oldest first.
-  const activity = useMemo(() => {
-    const buckets = new Array(14).fill(0) as number[];
+  // Mood flow: dominant core per day over the last 14 days, oldest first.
+  const moodFlow = useMemo(() => {
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-    for (const e of entries) {
-      const diffDays = Math.floor((startOfToday + DAY_MS - e.createdAt) / DAY_MS);
-      if (diffDays >= 0 && diffDays < 14) buckets[13 - diffDays] += 1;
+    const days: Array<ReturnType<typeof getCore> | null> = [];
+    for (let i = 13; i >= 0; i--) {
+      const from = startOfToday - i * DAY_MS;
+      const to = from + DAY_MS;
+      const counts = new Map<string, number>();
+      for (const e of entries) {
+        if (e.createdAt >= from && e.createdAt < to) {
+          for (const f of e.feelings) counts.set(f.coreId, (counts.get(f.coreId) ?? 0) + 1);
+        }
+      }
+      const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
+      days.push(top ? getCore(top[0]) ?? null : null);
     }
-    return buckets;
+    return days;
   }, [entries, today]);
+
+  // Memory: an entry from roughly one week ago (6-8 day window).
+  const memory = useMemo(() => {
+    const from = Date.now() - 8 * DAY_MS;
+    const to = Date.now() - 6 * DAY_MS;
+    return entries.find((e) => e.createdAt >= from && e.createdAt <= to) ?? null;
+  }, [entries]);
+
+  // Rotating daily reflection prompt.
+  const promptIndex = useMemo(() => {
+    const start = new Date(today.getFullYear(), 0, 0).getTime();
+    const dayOfYear = Math.floor((today.getTime() - start) / DAY_MS);
+    return (dayOfYear % 6) + 1;
+  }, [today]);
 
   // Dominant feeling today for the hero accent.
   const dominantCore = useMemo(() => {
@@ -189,29 +210,41 @@ export default function HomeScreen() {
               <Text style={[styles.quickLabel, { fontFamily: font(lang, 'semibold') }]}>
                 {t('home.quickLog')}
               </Text>
-              <View style={styles.quickRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.orbRow}
+              >
                 {FEELINGS_WHEEL.map((c) => (
                   <Pressable
                     key={c.id}
-                    style={({ pressed }) => [
-                      styles.quickChip,
-                      { backgroundColor: c.tint, borderColor: pressed ? c.color : theme.colors.border },
-                    ]}
+                    style={({ pressed }) => [styles.orbWrap, pressed && { transform: [{ scale: 0.92 }] }]}
                     onPress={() => {
                       haptics.selection();
                       router.push({ pathname: '/log', params: { coreId: c.id } });
                     }}
                   >
-                    <Text style={styles.quickEmoji}>{c.emoji}</Text>
+                    <View
+                      style={[
+                        styles.orb,
+                        {
+                          backgroundColor: c.tint,
+                          borderColor: c.color,
+                          shadowColor: c.color,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.orbEmoji}>{c.emoji}</Text>
+                    </View>
                     <Text
-                      style={[styles.quickName, { fontFamily: font(lang, 'semibold'), color: c.colorMid }]}
+                      style={[styles.orbName, { fontFamily: font(lang, 'semibold'), color: c.colorMid }]}
                       numberOfLines={1}
                     >
                       {lang === 'ar' ? c.ar : c.en}
                     </Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
             </Animated.View>
 
             {/* Stat tiles → stats tab */}
@@ -297,7 +330,7 @@ export default function HomeScreen() {
               </Animated.View>
             ) : null}
 
-            {/* 14-day activity → stats */}
+            {/* Mood flow strip → stats */}
             <Animated.View entering={fade(120)}>
               <Pressable
                 style={({ pressed }) => [styles.activityCard, pressed && styles.pressedCard]}
@@ -307,11 +340,90 @@ export default function HomeScreen() {
                 }}
               >
                 <Text style={[styles.cardLabel, { fontFamily: font(lang, 'semibold') }]}>
-                  {t('home.activity')}
+                  {t('home.moodFlow')}
                 </Text>
-                <ActivityBars values={activity} color={theme.colors.teal} />
+                <View style={styles.flowRow}>
+                  {moodFlow.map((core, i) => {
+                    const isToday = i === moodFlow.length - 1;
+                    return (
+                      <View
+                        key={i}
+                        style={[
+                          styles.flowCell,
+                          core
+                            ? { backgroundColor: core.color, opacity: 0.9 }
+                            : styles.flowCellEmpty,
+                          isToday && styles.flowCellToday,
+                        ]}
+                      >
+                        {core ? <Text style={styles.flowEmoji}>{core.emoji}</Text> : null}
+                      </View>
+                    );
+                  })}
+                </View>
+                <View style={styles.flowLabels}>
+                  <Text style={[styles.flowLabel, { fontFamily: font(lang, 'semibold') }]}>
+                    {t('home.flowStart')}
+                  </Text>
+                  <Text style={[styles.flowLabel, { fontFamily: font(lang, 'semibold') }]}>
+                    {t('home.flowToday')}
+                  </Text>
+                </View>
               </Pressable>
             </Animated.View>
+
+            {/* One week ago memory */}
+            {memory ? (
+              <Animated.View entering={fade(140)}>
+                <Pressable
+                  style={({ pressed }) => [styles.memoryCard, pressed && styles.pressedCard]}
+                  onPress={() => {
+                    haptics.selection();
+                    router.push({ pathname: '/log', params: { editId: String(memory.id) } });
+                  }}
+                >
+                  <Text style={styles.memoryIcon}>🫙</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.memoryLabel, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('home.memoryTitle')}
+                    </Text>
+                    <Text style={[styles.memoryText, { fontFamily: font(lang, 'bold') }]} numberOfLines={1}>
+                      {memory.feelings
+                        .map((f) => {
+                          const c = getCore(f.coreId);
+                          return c ? `${c.emoji} ${lang === 'ar' ? c.ar : c.en}` : '';
+                        })
+                        .join(' · ')}
+                    </Text>
+                    {memory.note ? (
+                      <Text style={[styles.memoryNote, { fontFamily: font(lang, 'regular') }]} numberOfLines={1}>
+                        “{memory.note}”
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              </Animated.View>
+            ) : (
+              <Animated.View entering={fade(140)}>
+                <Pressable
+                  style={({ pressed }) => [styles.promptCard, pressed && styles.pressedCard]}
+                  onPress={() => {
+                    haptics.selection();
+                    router.push('/log');
+                  }}
+                >
+                  <Text style={styles.memoryIcon}>💭</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.memoryLabel, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('home.promptTitle')}
+                    </Text>
+                    <Text style={[styles.promptText, { fontFamily: font(lang, 'bold') }]}>
+                      {t(`home.prompt${promptIndex}`)}
+                    </Text>
+                  </View>
+                </Pressable>
+              </Animated.View>
+            )}
 
             {recent.length > 0 ? (
               <View style={styles.sectionRow}>
@@ -472,6 +584,116 @@ const styles = StyleSheet.create({
   logButtonArrow: {
     color: '#FFFFFF',
     fontSize: 18,
+  },
+  orbRow: {
+    gap: 14,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  orbWrap: {
+    alignItems: 'center',
+    gap: 6,
+    width: 62,
+  },
+  orb: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  orbEmoji: {
+    fontSize: 24,
+  },
+  orbName: {
+    fontSize: 10.5,
+  },
+  flowRow: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+  },
+  flowCell: {
+    flex: 1,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flowCellEmpty: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    height: 12,
+    borderRadius: 4,
+  },
+  flowCellToday: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.55)',
+  },
+  flowEmoji: {
+    fontSize: 12,
+  },
+  flowLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  flowLabel: {
+    fontSize: 9,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: theme.colors.inkFaint,
+  },
+  memoryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  promptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(20, 184, 166, 0.35)',
+    backgroundColor: 'rgba(20, 184, 166, 0.07)',
+  },
+  memoryIcon: {
+    fontSize: 24,
+  },
+  memoryLabel: {
+    fontSize: 9,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.inkFaint,
+  },
+  memoryText: {
+    fontSize: 14,
+    color: theme.colors.ink,
+    marginTop: 2,
+  },
+  memoryNote: {
+    fontSize: 12,
+    color: theme.colors.inkSoft,
+    marginTop: 2,
+  },
+  promptText: {
+    fontSize: 14,
+    color: theme.colors.tealSoft,
+    marginTop: 2,
+    lineHeight: 20,
   },
   quickLabel: {
     fontSize: 10,
