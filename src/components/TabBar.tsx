@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import * as haptics from '../haptics';
 import { theme, font } from '../theme';
+import { Pressy } from './Pressy';
 
 /** Minimal structural types — avoids coupling to expo-router's vendored
  * react-navigation type definitions. */
@@ -56,9 +57,10 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
         const label = options.title ?? route.name;
 
         return (
-          <Pressable
+          <Pressy
             key={route.key}
             style={styles.item}
+            scaleTo={0.9}
             onPress={() => {
               haptics.selection();
               const event = navigation.emit({
@@ -87,7 +89,7 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
             >
               {label}
             </Text>
-          </Pressable>
+          </Pressy>
         );
       })}
     </View>

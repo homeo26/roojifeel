@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import * as haptics from '../haptics';
 import { theme, font } from '../theme';
+import { Pressy } from './Pressy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -135,13 +136,13 @@ export function TimeRangePicker({ value, onChange }: Props) {
   return (
     <>
       {/* Trigger */}
-      <Pressable style={styles.trigger} onPress={() => setOpen(true)}>
+      <Pressy style={styles.trigger} scaleTo={0.96} onPress={() => setOpen(true)}>
         <Ionicons name="time-outline" size={15} color={theme.colors.tealSoft} />
         <Text style={[styles.triggerText, { fontFamily: font(lang, 'semibold') }]}>
           {rangeLabel(value, t, lang)}
         </Text>
         <Ionicons name="chevron-down" size={13} color={theme.colors.inkFaint} />
-      </Pressable>
+      </Pressy>
 
       {/* Sheet */}
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -151,9 +152,10 @@ export function TimeRangePicker({ value, onChange }: Props) {
             {/* Mode tabs */}
             <View style={styles.modeRow}>
               {(['quick', 'absolute'] as const).map((m) => (
-                <Pressable
+                <Pressy
                   key={m}
                   style={[styles.modeTab, mode === m && styles.modeTabActive]}
+                  scaleTo={0.96}
                   onPress={() => {
                     haptics.selection();
                     setMode(m);
@@ -168,16 +170,17 @@ export function TimeRangePicker({ value, onChange }: Props) {
                   >
                     {t(`range.${m}`)}
                   </Text>
-                </Pressable>
+                </Pressy>
               ))}
             </View>
 
             {mode === 'quick' ? (
               <View style={styles.quickWrap}>
                 {QUICK.map((r, i) => (
-                  <Pressable
+                  <Pressy
                     key={i}
                     style={[styles.quickChip, isActive(r) && styles.quickChipActive]}
+                    scaleTo={0.94}
                     onPress={() => applyQuick(r)}
                   >
                     <Text
@@ -189,7 +192,7 @@ export function TimeRangePicker({ value, onChange }: Props) {
                     >
                       {rangeLabel(r, t, lang)}
                     </Text>
-                  </Pressable>
+                  </Pressy>
                 ))}
               </View>
             ) : (
@@ -232,12 +235,12 @@ export function TimeRangePicker({ value, onChange }: Props) {
                     onChange={onPick(androidPicker)}
                   />
                 ) : null}
-                <Pressable style={styles.applyBtn} onPress={applyAbsolute}>
+                <Pressy style={styles.applyBtn} scaleTo={0.96} onPress={applyAbsolute}>
                   <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                   <Text style={[styles.applyText, { fontFamily: font(lang, 'bold') }]}>
                     {t('range.apply')}
                   </Text>
-                </Pressable>
+                </Pressy>
               </View>
             )}
           </Pressable>

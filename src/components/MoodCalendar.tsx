@@ -10,6 +10,7 @@ import { FeelingEntry, getEntriesBetween } from '../db';
 import { getCore } from '../data/feelings';
 import { theme, font } from '../theme';
 import * as haptics from '../haptics';
+import { Pressy } from './Pressy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -87,23 +88,23 @@ export function MoodCalendar() {
           {t('stats.moodCalendar')}
         </Text>
         <View style={styles.navRow}>
-          <Pressable hitSlop={8} onPress={() => shift(-1)}>
+          <Pressy hitSlop={8} scaleTo={0.75} onPress={() => shift(-1)}>
             <Ionicons
               name="chevron-back"
               size={18}
               color={theme.colors.inkSoft}
               style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
             />
-          </Pressable>
+          </Pressy>
           <Text style={[styles.monthLabel, { fontFamily: font(lang, 'bold') }]}>{monthLabel}</Text>
-          <Pressable hitSlop={8} onPress={() => shift(1)} disabled={isCurrentMonth}>
+          <Pressy hitSlop={8} scaleTo={0.75} onPress={() => shift(1)} disabled={isCurrentMonth}>
             <Ionicons
               name="chevron-forward"
               size={18}
               color={isCurrentMonth ? theme.colors.border : theme.colors.inkSoft}
               style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
             />
-          </Pressable>
+          </Pressy>
         </View>
       </View>
 

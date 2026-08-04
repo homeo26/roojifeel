@@ -16,6 +16,7 @@ import { FeelingEntry, getEntriesBetween } from '../src/db';
 import { getCore, getTertiary, label } from '../src/data/feelings';
 import { theme, font } from '../src/theme';
 import * as haptics from '../src/haptics';
+import { Pressy } from '../src/components/Pressy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -127,16 +128,17 @@ export default function WrappedScreen() {
       edges={['top', 'bottom']}
     >
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerBtn}>
+        <Pressy onPress={() => router.back()} hitSlop={12} scaleTo={0.85} style={styles.headerBtn}>
           <Ionicons name="close" size={24} color={theme.colors.ink} />
-        </Pressable>
+        </Pressy>
         <View style={styles.monthNav}>
-          <Pressable hitSlop={8} onPress={() => shiftMonth(-1)}>
+          <Pressy hitSlop={8} scaleTo={0.75} onPress={() => shiftMonth(-1)}>
             <Ionicons name="chevron-back" size={18} color={theme.colors.inkSoft} style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }} />
-          </Pressable>
+          </Pressy>
           <Text style={[styles.monthLabel, { fontFamily: font(lang, 'bold') }]}>{monthLabel}</Text>
-          <Pressable
+          <Pressy
             hitSlop={8}
+            scaleTo={0.75}
             onPress={() => shiftMonth(1)}
             disabled={year === now.getFullYear() && month === now.getMonth()}
           >
@@ -150,7 +152,7 @@ export default function WrappedScreen() {
               }
               style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
             />
-          </Pressable>
+          </Pressy>
         </View>
         <View style={styles.headerBtn} />
       </View>

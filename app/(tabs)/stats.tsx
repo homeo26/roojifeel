@@ -507,6 +507,7 @@ export default function StatsScreen() {
                   style={[styles.coreCard, expanded && { borderColor: stat.core.color }]}
                 >
                   <Pressable
+                    style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
                     onPress={() => {
                       haptics.selection();
                       setExpandedCore(expanded ? null : stat.core.id);

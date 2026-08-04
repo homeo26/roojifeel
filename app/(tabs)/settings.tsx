@@ -20,6 +20,7 @@ import * as haptics from '../../src/haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { theme, font } from '../../src/theme';
+import { Pressy } from '../../src/components/Pressy';
 import { saveLanguage } from '../../src/i18n';
 import {
   ReminderTime,
@@ -181,15 +182,16 @@ export default function SettingsScreen() {
                 <Text style={[styles.reminderTime, { fontFamily: font(lang, 'bold') }]}>
                   {fmtTime(r)}
                 </Text>
-                <Pressable hitSlop={10} onPress={() => removeReminder(i)}>
+                <Pressy hitSlop={10} scaleTo={0.8} onPress={() => removeReminder(i)}>
                   <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
-                </Pressable>
+                </Pressy>
               </Animated.View>
             ))
           )}
 
-          <Pressable
+          <Pressy
             style={styles.addBtn}
+            scaleTo={0.97}
             onPress={() => {
               haptics.selection();
               setShowTimePicker(true);
@@ -199,7 +201,7 @@ export default function SettingsScreen() {
             <Text style={[styles.addBtnText, { fontFamily: font(lang, 'bold') }]}>
               {t('settings.addReminder')}
             </Text>
-          </Pressable>
+          </Pressy>
 
           {showTimePicker ? (
             <View style={styles.pickerWrap}>
@@ -212,17 +214,17 @@ export default function SettingsScreen() {
               />
               {Platform.OS === 'ios' ? (
                 <View style={styles.pickerActions}>
-                  <Pressable style={styles.pickerCancel} onPress={() => setShowTimePicker(false)}>
+                  <Pressy style={styles.pickerCancel} onPress={() => setShowTimePicker(false)}>
                     <Text style={[styles.pickerCancelText, { fontFamily: font(lang, 'semibold') }]}>
                       {t('history.cancel')}
                     </Text>
-                  </Pressable>
-                  <Pressable style={styles.pickerApply} onPress={confirmPendingTime}>
+                  </Pressy>
+                  <Pressy style={styles.pickerApply} scaleTo={0.94} onPress={confirmPendingTime}>
                     <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                     <Text style={[styles.pickerApplyText, { fontFamily: font(lang, 'bold') }]}>
                       {t('range.apply')}
                     </Text>
-                  </Pressable>
+                  </Pressy>
                 </View>
               ) : null}
             </View>
@@ -234,8 +236,9 @@ export default function SettingsScreen() {
           {t('settings.language')}
         </Text>
         <View style={styles.langRow}>
-          <Pressable
+          <Pressy
             style={[styles.langChip, lang === 'en' && styles.langChipActive]}
+            scaleTo={0.96}
             onPress={() => switchLanguage('en')}
           >
             <Text
@@ -247,9 +250,10 @@ export default function SettingsScreen() {
             >
               {t('settings.english')}
             </Text>
-          </Pressable>
-          <Pressable
+          </Pressy>
+          <Pressy
             style={[styles.langChip, lang === 'ar' && styles.langChipActive]}
+            scaleTo={0.96}
             onPress={() => switchLanguage('ar')}
           >
             <Text
@@ -261,7 +265,7 @@ export default function SettingsScreen() {
             >
               {t('settings.arabic')}
             </Text>
-          </Pressable>
+          </Pressy>
         </View>
 
         {/* Haptics */}
@@ -292,7 +296,7 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
           {t('settings.data')}
         </Text>
-        <Pressable style={styles.card} onPress={onExport} disabled={busy}>
+        <Pressy style={styles.card} scaleTo={0.98} onPress={onExport} disabled={busy}>
           <View style={styles.row}>
             <Ionicons name="share-outline" size={24} color={theme.colors.accent} />
             <View style={styles.rowText}>
@@ -304,7 +308,7 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
-        </Pressable>
+        </Pressy>
         <View style={styles.card}>
           <View style={styles.row}>
             <Ionicons name="cloud-upload-outline" size={24} color={theme.colors.accent} />
@@ -333,7 +337,7 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
-        <Pressable style={styles.card} onPress={onImport} disabled={busy}>
+        <Pressy style={styles.card} scaleTo={0.98} onPress={onImport} disabled={busy}>
           <View style={styles.row}>
             <Ionicons name="download-outline" size={24} color={theme.colors.accent} />
             <View style={styles.rowText}>
@@ -345,7 +349,7 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
-        </Pressable>
+        </Pressy>
 
         <Text style={[styles.about, { fontFamily: font(lang, 'regular') }]}>
           {t('settings.about')}
