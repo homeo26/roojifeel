@@ -21,6 +21,7 @@ import { EntryCard } from '../components/EntryCard';
 import { theme, font, displayFont } from '../theme';
 import { isSameDay } from '../timeFormat';
 import { useTabPager } from './TabPagerContext';
+import { CoreLegend } from '../components/CoreLegend';
 import { claimMilestone, computeStreak, nextMilestone } from '../streaks';
 import { refreshWidget } from '../widget/RoojifeelWidget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -413,6 +414,9 @@ export function HomeScreen() {
                     {t('home.flowToday')}
                   </Text>
                 </View>
+                <CoreLegend
+                  coreIds={[...new Set(moodFlow.filter(Boolean).map((c) => c!.id))]}
+                />
               </Pressable>
             </Animated.View>
 

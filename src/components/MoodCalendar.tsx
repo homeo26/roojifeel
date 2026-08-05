@@ -7,7 +7,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FeelingEntry, getEntriesBetween } from '../db';
-import { getCore } from '../data/feelings';
+import { getCore, label as feelingLabel } from '../data/feelings';
+import { CoreLegend } from './CoreLegend';
 import { theme, font } from '../theme';
 import * as haptics from '../haptics';
 import { Pressy } from './Pressy';
@@ -21,11 +22,13 @@ export function MoodCalendar() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const monthStart = new Date(year, month, 1).getTime();
   const monthEnd = new Date(year, month + 1, 1).getTime() - 1;
 
   useEffect(() => {
+    setSelectedDay(null);
     getEntriesBetween(monthStart, monthEnd).then(setEntries);
   }, [monthStart, monthEnd]);
 
@@ -41,11 +44,22 @@ export function MoodCalendar() {
       }
       for (const f of e.feelings) counts.set(f.coreId, (counts.get(f.coreId) ?? 0) + 1);
     }
-    const result = new Map<number, { color: string; tint: string; emoji: string }>();
+    const result = new Map<
+      number,
+      { color: string; tint: string; emoji: string; coreId: string; total: number }
+    >();
     for (const [day, counts] of byDay) {
       const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
       const core = getCore(top[0]);
-      if (core) result.set(day, { color: core.color, tint: core.tint, emoji: core.emoji });
+      const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
+      if (core)
+        result.set(day, {
+          color: core.color,
+          tint: core.tint,
+          emoji: core.emoji,
+          coreId: core.id,
+          total,
+        });
     }
     return result;
   }, [entries]);
@@ -119,13 +133,19 @@ export function MoodCalendar() {
           const mood = dayColors.get(day);
           const isToday = isCurrentMonth && day === now.getDate();
           return (
-            <View
+            <Pressable
               key={`d-${day}`}
+              disabled={!mood}
+              onPress={() => {
+                haptics.selection();
+                setSelectedDay(selectedDay === day ? null : day);
+              }}
               style={[
                 styles.cell,
                 styles.dayCell,
                 mood ? { backgroundColor: mood.tint, borderColor: mood.color } : null,
                 isToday && styles.today,
+                selectedDay === day && styles.daySelected,
               ]}
             >
               <Text
@@ -138,10 +158,27 @@ export function MoodCalendar() {
                 {day}
               </Text>
               {mood ? <Text style={styles.dayEmoji}>{mood.emoji}</Text> : null}
-            </View>
+            </Pressable>
           );
         })}
       </View>
+
+      {selectedDay != null && dayColors.get(selectedDay) ? (
+        <View style={[styles.dayDetail, { borderColor: dayColors.get(selectedDay)!.color }]}>
+          <Text style={styles.dayDetailEmoji}>{dayColors.get(selectedDay)!.emoji}</Text>
+          <Text style={[styles.dayDetailText, { fontFamily: font(lang, 'bold') }]}>
+            {t('stats.dayDetail', {
+              day: selectedDay,
+              feeling: feelingLabel(getCore(dayColors.get(selectedDay)!.coreId), lang),
+              count: dayColors.get(selectedDay)!.total,
+            })}
+          </Text>
+        </View>
+      ) : null}
+
+      <CoreLegend
+        coreIds={[...new Set(Array.from(dayColors.values()).map((m) => m.coreId))]}
+      />
     </View>
   );
 }
@@ -205,6 +242,30 @@ const styles = StyleSheet.create({
   today: {
     borderWidth: 1.5,
     borderColor: theme.colors.purpleSoft,
+  },
+  daySelected: {
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  dayDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  dayDetailEmoji: {
+    fontSize: 16,
+  },
+  dayDetailText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: theme.colors.ink,
+    textAlign: 'left',
   },
   dayNum: {
     fontSize: 11,
