@@ -294,6 +294,27 @@ export function HomeScreen() {
               </Pressable>
             </Animated.View>
 
+            {/* Daily reflection prompt */}
+            <Animated.View entering={fade(160)}>
+                <Pressable
+                  style={({ pressed }) => [styles.promptCard, pressed && styles.pressedCard]}
+                  onPress={() => {
+                    haptics.selection();
+                    router.push('/log');
+                  }}
+                >
+                  <Text style={styles.memoryIcon}>💭</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.memoryLabel, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('home.promptTitle')}
+                    </Text>
+                    <Text style={[styles.promptText, { fontFamily: font(lang, 'bold') }]}>
+                      {t(`home.prompt${promptIndex}`)}
+                    </Text>
+                  </View>
+                </Pressable>
+              </Animated.View>
+
             {/* Stat tiles → stats tab */}
             <Animated.View entering={fade(60)} style={styles.statRow}>
               {[
@@ -454,27 +475,6 @@ export function HomeScreen() {
                 </Pressable>
               </Animated.View>
             ) : null}
-
-            {/* Daily reflection prompt */}
-            <Animated.View entering={fade(160)}>
-                <Pressable
-                  style={({ pressed }) => [styles.promptCard, pressed && styles.pressedCard]}
-                  onPress={() => {
-                    haptics.selection();
-                    router.push('/log');
-                  }}
-                >
-                  <Text style={styles.memoryIcon}>💭</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.memoryLabel, { fontFamily: font(lang, 'semibold') }]}>
-                      {t('home.promptTitle')}
-                    </Text>
-                    <Text style={[styles.promptText, { fontFamily: font(lang, 'bold') }]}>
-                      {t(`home.prompt${promptIndex}`)}
-                    </Text>
-                  </View>
-                </Pressable>
-              </Animated.View>
 
             {recent.length > 0 ? (
               <View style={styles.sectionRow}>
