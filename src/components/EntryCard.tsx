@@ -32,9 +32,20 @@ interface Props {
   entry: FeelingEntry;
   index?: number;
   onLongPress?: () => void;
+  /** Multi-select mode: taps toggle instead of opening the editor. */
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-export function EntryCard({ entry, index = 0, onLongPress }: Props) {
+export function EntryCard({
+  entry,
+  index = 0,
+  onLongPress,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
+}: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const router = useRouter();
@@ -46,10 +57,30 @@ export function EntryCard({ entry, index = 0, onLongPress }: Props) {
   return (
     <Animated.View entering={FadeIn.duration(theme.motion.base).delay(Math.min(index, 6) * 40)}>
       <Pressable
-        onPress={() => router.push({ pathname: '/log', params: { editId: String(entry.id) } })}
+        onPress={() => {
+          if (selectionMode) {
+            haptics.selection();
+            onToggleSelect?.();
+          } else {
+            router.push({ pathname: '/log', params: { editId: String(entry.id) } });
+          }
+        }}
         onLongPress={onLongPress}
-        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        style={({ pressed }) => [
+          styles.card,
+          selected && styles.cardSelected,
+          pressed && styles.cardPressed,
+        ]}
       >
+        {selectionMode ? (
+          <View style={styles.selectRing}>
+            <Ionicons
+              name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+              size={22}
+              color={selected ? theme.colors.purpleSoft : theme.colors.inkFaint}
+            />
+          </View>
+        ) : null}
         <View style={[styles.stripe, { backgroundColor: core.color }]} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: core.tint, borderRadius: theme.radius.md }]} />
         <View style={styles.body}>
@@ -151,6 +182,15 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     opacity: 0.8,
+  },
+  cardSelected: {
+    borderColor: theme.colors.purple,
+    borderWidth: 1.5,
+  },
+  selectRing: {
+    justifyContent: 'center',
+    paddingStart: 10,
+    zIndex: 2,
   },
   stripe: {
     width: 3,

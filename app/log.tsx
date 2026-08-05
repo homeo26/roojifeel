@@ -44,6 +44,7 @@ import {
 import { FeelingPath, addEntry, deleteEntry, getAllEntries, getAllTags, getEntry, updateEntry } from '../src/db';
 import { deleteAttachment, isPersisted, persistAttachment } from '../src/attachments';
 import { syncSmartReminders } from '../src/notifications';
+import { shareEntries } from '../src/share';
 import { refreshWidget } from '../src/widget/RoojifeelWidget';
 import { theme, font } from '../src/theme';
 
@@ -319,7 +320,20 @@ export default function LogScreen() {
               />
             ))}
           </View>
-          <View style={styles.backBtn} />
+          <View style={styles.backBtn}>
+            {editingId != null && step === 3 ? (
+              <Pressable
+                hitSlop={10}
+                onPress={async () => {
+                  haptics.selection();
+                  const entry = await getEntry(editingId);
+                  if (entry) await shareEntries([entry], lang, t);
+                }}
+              >
+                <Ionicons name="share-outline" size={22} color={theme.colors.inkSoft} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {/* Wheel trail while picking */}

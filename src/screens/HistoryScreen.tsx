@@ -2,6 +2,9 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getCore, getSecondary, getTertiary } from '../data/feelings';
+import { shareEntries } from '../share';
+import * as haptics from '../haptics';
+import { Pressy } from '../components/Pressy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +23,7 @@ export function HistoryScreen() {
   const lang = i18n.language;
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [query, setQuery] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<number> | null>(null);
 
   const reload = useCallback(() => {
     getAllEntries().then(setEntries);
@@ -65,6 +69,45 @@ export function HistoryScreen() {
     return Array.from(byDay.values());
   }, [filtered, t, lang]);
 
+  const enterSelection = (entry: FeelingEntry) => {
+    haptics.selection();
+    setSelectedIds(new Set([entry.id]));
+  };
+
+  const toggleSelect = (entry: FeelingEntry) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev ?? []);
+      if (next.has(entry.id)) next.delete(entry.id);
+      else next.add(entry.id);
+      return next;
+    });
+  };
+
+  const exitSelection = () => setSelectedIds(null);
+
+  const shareSelected = async () => {
+    if (!selectedIds || selectedIds.size === 0) return;
+    haptics.selection();
+    const chosen = entries.filter((e) => selectedIds.has(e.id));
+    await shareEntries(chosen, lang, t);
+  };
+
+  const deleteSelected = () => {
+    if (!selectedIds || selectedIds.size === 0) return;
+    Alert.alert(t('history.deleteTitle'), t('history.deleteMessage'), [
+      { text: t('history.cancel'), style: 'cancel' },
+      {
+        text: t('history.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          for (const id of selectedIds) await deleteEntry(id);
+          exitSelection();
+          reload();
+        },
+      },
+    ]);
+  };
+
   const confirmDelete = (entry: FeelingEntry) => {
     Alert.alert(t('history.deleteTitle'), t('history.deleteMessage'), [
       { text: t('history.cancel'), style: 'cancel' },
@@ -91,6 +134,40 @@ export function HistoryScreen() {
             <Text style={[styles.title, { fontFamily: font(lang, 'extrabold') }]}>
               {t('history.title')}
             </Text>
+            {selectedIds != null ? (
+              <View style={styles.selectionBar}>
+                <Pressy hitSlop={10} scaleTo={0.85} onPress={exitSelection}>
+                  <Ionicons name="close" size={20} color={theme.colors.inkSoft} />
+                </Pressy>
+                <Text style={[styles.selectionCount, { fontFamily: font(lang, 'bold') }]}>
+                  {t('history.selectedCount', { count: selectedIds.size })}
+                </Text>
+                <Pressy
+                  hitSlop={10}
+                  scaleTo={0.85}
+                  onPress={shareSelected}
+                  disabled={selectedIds.size === 0}
+                >
+                  <Ionicons
+                    name="share-outline"
+                    size={20}
+                    color={selectedIds.size > 0 ? theme.colors.purpleSoft : theme.colors.inkFaint}
+                  />
+                </Pressy>
+                <Pressy
+                  hitSlop={10}
+                  scaleTo={0.85}
+                  onPress={deleteSelected}
+                  disabled={selectedIds.size === 0}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={20}
+                    color={selectedIds.size > 0 ? theme.colors.danger : theme.colors.inkFaint}
+                  />
+                </Pressy>
+              </View>
+            ) : (
             <View style={styles.searchWrap}>
               <Ionicons name="search" size={16} color={theme.colors.inkFaint} />
               <TextInput
@@ -111,6 +188,7 @@ export function HistoryScreen() {
                 />
               ) : null}
             </View>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -122,7 +200,14 @@ export function HistoryScreen() {
           <Text style={[styles.day, { fontFamily: font(lang, 'bold') }]}>{section.title}</Text>
         )}
         renderItem={({ item, index }) => (
-          <EntryCard entry={item} index={index} onLongPress={() => confirmDelete(item)} />
+          <EntryCard
+            entry={item}
+            index={index}
+            selectionMode={selectedIds != null}
+            selected={selectedIds?.has(item.id) ?? false}
+            onToggleSelect={() => toggleSelect(item)}
+            onLongPress={() => (selectedIds == null ? enterSelection(item) : undefined)}
+          />
         )}
       />
     </SafeAreaView>
@@ -144,6 +229,25 @@ const styles = StyleSheet.create({
     color: theme.colors.ink,
     marginTop: theme.spacing.md,
     marginBottom: theme.spacing.sm,
+    textAlign: 'left',
+  },
+  selectionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    backgroundColor: 'rgba(124, 58, 237, 0.10)',
+    borderWidth: 1,
+    borderColor: theme.colors.purple,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    marginTop: 4,
+    marginBottom: theme.spacing.sm,
+  },
+  selectionCount: {
+    flex: 1,
+    fontSize: 14,
+    color: theme.colors.ink,
     textAlign: 'left',
   },
   searchWrap: {
