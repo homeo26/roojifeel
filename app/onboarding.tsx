@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: theme.o(0.15),
   },
   dotActive: {
     width: 22,

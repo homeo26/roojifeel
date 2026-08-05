@@ -5,7 +5,7 @@
  * gauges, daily activity, time-of-day and weekday breakdowns, per-core
  * branch drill-down, top feelings.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -32,6 +32,7 @@ import {
   resolveRange,
 } from '../components/TimeRangePicker';
 import { theme, font } from '../theme';
+import { WeekStart, getDefaultRangeDays, getWeekStart } from '../prefs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const fade = (delay = 0) => FadeIn.duration(theme.motion.base).delay(delay);
@@ -88,6 +89,15 @@ export function StatsScreen() {
   const [range, setRange] = useState<TimeRange>(DEFAULT_RANGE);
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [expandedCore, setExpandedCore] = useState<string | null>(null);
+  const [weekStart, setWeekStartState] = useState<WeekStart>('mon');
+
+  // Load user preferences (default range applies until the user changes it).
+  useEffect(() => {
+    getWeekStart().then(setWeekStartState);
+    getDefaultRangeDays().then((days) => {
+      if (days !== 14) setRange({ kind: 'last', days });
+    });
+  }, []);
 
   const [trendEntries, setTrendEntries] = useState<FeelingEntry[]>([]);
 
@@ -219,19 +229,19 @@ export function StatsScreen() {
     const buckets = new Array(7).fill(0) as number[];
     for (const e of entries) {
       const jsDay = new Date(e.createdAt).getDay(); // 0=Sun
-      buckets[(jsDay + 6) % 7] += 1;
+      buckets[weekStart === 'sun' ? jsDay : (jsDay + 6) % 7] += 1;
     }
     return buckets;
-  }, [entries]);
+  }, [entries, weekStart]);
 
   const weekdayNames = useMemo(() => {
-    // Monday-first localized short names (Mon 2024-01-01).
-    const base = new Date(2024, 0, 1);
+    // Localized short names starting on the preferred first weekday.
+    const base = weekStart === 'sun' ? new Date(2023, 11, 31) : new Date(2024, 0, 1);
     return new Array(7).fill(0).map((_, i) => {
       const d = new Date(base.getTime() + i * DAY_MS);
       return d.toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', { weekday: 'short' });
     });
-  }, [lang]);
+  }, [lang, weekStart]);
 
   const topFeelings = useMemo(() => {
     const counts = new Map<string, { name: string; color: string; count: number }>();
@@ -753,7 +763,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.o(0.06),
     overflow: 'hidden',
   },
   hbarFill: {
@@ -840,7 +850,7 @@ const styles = StyleSheet.create({
   barTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.o(0.06),
     marginTop: 10,
     overflow: 'hidden',
   },

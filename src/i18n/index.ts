@@ -203,6 +203,18 @@ const en = {
       noReminders: 'No reminders yet',
       reminderTime: 'Reminder time',
       language: 'Language',
+      systemLanguage: 'System',
+      appearance: 'Appearance',
+      appearanceDesc: 'Theme changes apply the next time you open the app',
+      themeDark: 'Dark',
+      themeLight: 'Light',
+      themeSystem: 'System',
+      restartForTheme: 'Theme saved — restart Roojifeel to apply it.',
+      weekStart: 'Week starts on',
+      weekSunday: 'Sunday',
+      weekMonday: 'Monday',
+      defaultRange: 'Default stats range',
+      aboutTitle: 'About Roojifeel',
       haptics: 'Feedback',
       hapticsTitle: 'Haptic feedback',
       hapticsDesc: 'Gentle vibrations on taps and confirmations',
@@ -228,6 +240,13 @@ const en = {
       permissionDenied: 'Notifications are disabled. Enable them in system settings.',
       restartForRTL: 'Please restart the app to fully apply the layout direction.',
       about: 'Roojifeel keeps every feeling on your device. Nothing is uploaded, ever.',
+    },
+    about: {
+      version: 'Version {{version}}',
+      manifestoTitle: 'Yours alone',
+      manifesto: 'Every feeling, note, photo and voice memo you put into Roojifeel lives only on this device. There are no accounts, no servers, no analytics, and no tracking of any kind. Backups and exports go to storage you own. Naming a feeling is an intimate act — it deserves a private room.',
+      sourceCode: 'Source code on GitHub',
+      credits: 'Built with Expo & React Native.\nBased on the feelings wheel by Dr. Gloria Willcox.\nMIT licensed.',
     },
     share: {
       intensity: 'Intensity',
@@ -483,6 +502,18 @@ const ar = {
       noReminders: 'لا توجد تذكيرات بعد',
       reminderTime: 'وقت التذكير',
       language: 'اللغة',
+      systemLanguage: 'النظام',
+      appearance: 'المظهر',
+      appearanceDesc: 'يُطبق تغيير المظهر عند فتح التطبيق في المرة القادمة',
+      themeDark: 'داكن',
+      themeLight: 'فاتح',
+      themeSystem: 'النظام',
+      restartForTheme: 'حُفظ المظهر — أعد تشغيل روجيفيل لتطبيقه.',
+      weekStart: 'يبدأ الأسبوع يوم',
+      weekSunday: 'الأحد',
+      weekMonday: 'الاثنين',
+      defaultRange: 'الفترة الافتراضية للإحصائيات',
+      aboutTitle: 'عن روجيفيل',
       haptics: 'الاستجابة',
       hapticsTitle: 'الاهتزاز اللمسي',
       hapticsDesc: 'اهتزازات خفيفة عند النقر والتأكيد',
@@ -511,6 +542,13 @@ const ar = {
       permissionDenied: 'الإشعارات معطلة. فعّلها من إعدادات النظام.',
       restartForRTL: 'يرجى إعادة تشغيل التطبيق لتطبيق اتجاه الواجهة كاملاً.',
       about: 'روجيفيل يحفظ كل شعور على جهازك. لا يُرفع أي شيء أبداً.',
+    },
+    about: {
+      version: 'الإصدار {{version}}',
+      manifestoTitle: 'لك وحدك',
+      manifesto: 'كل شعور وملاحظة وصورة وتسجيل صوتي تضعه في روجيفيل يبقى على هذا الجهاز فقط. لا حسابات، لا خوادم، لا تحليلات، ولا أي تتبع. النسخ الاحتياطية والتصدير تذهب إلى مساحة تخزين تملكها أنت. تسمية الشعور فعل حميم — يستحق غرفة خاصة.',
+      sourceCode: 'الكود المصدري على GitHub',
+      credits: 'بُني بـ Expo و React Native.\nمبني على عجلة المشاعر للدكتورة غلوريا ويلكوكس.\nرخصة MIT.',
     },
     share: {
       intensity: 'الشدة',
@@ -565,7 +603,8 @@ export function detectInitialLanguage(): string {
 export async function loadSavedLanguage(): Promise<string> {
   try {
     const saved = await AsyncStorage.getItem(LANG_KEY);
-    return saved ?? detectInitialLanguage();
+    if (!saved || saved === 'system') return detectInitialLanguage();
+    return saved;
   } catch {
     return detectInitialLanguage();
   }

@@ -42,7 +42,7 @@ export function Gauge({
   size = 150,
   strokeWidth = 14,
   color = theme.colors.teal,
-  trackColor = 'rgba(255,255,255,0.08)',
+  trackColor = theme.o(0.08),
   label,
   caption,
   labelFont,
@@ -257,7 +257,7 @@ function Bar({
         {
           flex: 1,
           borderRadius: 2,
-          backgroundColor: active ? color : 'rgba(255,255,255,0.08)',
+          backgroundColor: active ? color : theme.o(0.08),
         },
         animatedStyle,
       ]}

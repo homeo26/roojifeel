@@ -21,7 +21,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { theme, font } from '../theme';
 import { Pressy } from '../components/Pressy';
-import { saveLanguage } from '../i18n';
+import { detectInitialLanguage, saveLanguage } from '../i18n';
 import {
   ReminderTime,
   applyReminders,
@@ -31,6 +31,12 @@ import {
 } from '../notifications';
 import { exportHistory, importHistory } from '../exportImport';
 import { disableBackup, enableBackup, getBackupStatus } from '../backup';
+import { WeekStart, getDefaultRangeDays, getWeekStart, setDefaultRangeDays, setWeekStart } from '../prefs';
+import { getThemeMode, setThemeMode } from '../themeBoot';
+import type { ThemeMode } from '../theme';
+import { LANG_KEY } from '../i18n';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const layoutT = () => LinearTransition.duration(theme.motion.fast);
 
@@ -45,6 +51,40 @@ export function SettingsScreen() {
   const [hapticsOn, setHapticsOn] = useState(haptics.hapticsEnabled());
   const [backupOn, setBackupOn] = useState(false);
   const [lastBackup, setLastBackup] = useState<number | null>(null);
+  const router = useRouter();
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
+  const [weekStart, setWeekStartState] = useState<WeekStart>('mon');
+  const [defaultRange, setDefaultRangeState] = useState(14);
+  const [langPref, setLangPref] = useState<string>('en');
+
+  useEffect(() => {
+    setThemeModeState(getThemeMode());
+    getWeekStart().then(setWeekStartState);
+    getDefaultRangeDays().then(setDefaultRangeState);
+    AsyncStorage.getItem(LANG_KEY).then((v) => setLangPref(v ?? 'system'));
+  }, []);
+
+  const chooseTheme = (mode: ThemeMode) => {
+    if (mode === themeMode) return;
+    haptics.selection();
+    setThemeMode(mode);
+    setThemeModeState(mode);
+    Alert.alert(t('settings.restartForTheme'));
+  };
+
+  const chooseWeekStart = async (v: WeekStart) => {
+    if (v === weekStart) return;
+    haptics.selection();
+    await setWeekStart(v);
+    setWeekStartState(v);
+  };
+
+  const chooseDefaultRange = async (days: number) => {
+    if (days === defaultRange) return;
+    haptics.selection();
+    await setDefaultRangeDays(days);
+    setDefaultRangeState(days);
+  };
 
   useEffect(() => {
     getBackupStatus().then((st) => {
@@ -112,17 +152,15 @@ export function SettingsScreen() {
     persist(reminders.filter((_, i) => i !== index));
   };
 
-  const switchLanguage = (next: 'en' | 'ar') => {
-    if (next === lang) return;
+  const switchLanguage = (next: 'system' | 'en' | 'ar') => {
+    if (next === langPref) return;
     haptics.selection();
-    // Let the press animation render before the app-wide re-render that
-    // changeLanguage triggers (it would otherwise freeze the JS thread
-    // mid-animation and make the button feel stuck).
+    setLangPref(next);
+    // Deferred so the press animation isn't frozen by the app-wide re-render.
     setTimeout(async () => {
       await saveLanguage(next);
-      await i18n.changeLanguage(next);
-      // Layout direction is fully handled in JS (per-screen `direction`
-      // styles + custom tab bar) — no native flag, no restart needed.
+      const resolved = next === 'system' ? detectInitialLanguage() : next;
+      await i18n.changeLanguage(resolved);
     }, 120);
   };
 
@@ -248,36 +286,112 @@ export function SettingsScreen() {
           {t('settings.language')}
         </Text>
         <View style={styles.langRow}>
-          <Pressy
-            style={[styles.langChip, lang === 'en' && styles.langChipActive]}
-            scaleTo={0.96}
-            onPress={() => switchLanguage('en')}
-          >
-            <Text
-              style={[
-                styles.langText,
-                { fontFamily: theme.fonts.bold },
-                lang === 'en' && styles.langTextActive,
-              ]}
+          {([
+            ['system', t('settings.systemLanguage'), font(lang, 'bold')],
+            ['en', t('settings.english'), theme.fonts.bold],
+            ['ar', t('settings.arabic'), theme.fonts.arBold],
+          ] as const).map(([value, text, fam]) => (
+            <Pressy
+              key={value}
+              style={[styles.langChip, langPref === value && styles.langChipActive]}
+              scaleTo={0.96}
+              onPress={() => switchLanguage(value)}
             >
-              {t('settings.english')}
-            </Text>
-          </Pressy>
-          <Pressy
-            style={[styles.langChip, lang === 'ar' && styles.langChipActive]}
-            scaleTo={0.96}
-            onPress={() => switchLanguage('ar')}
-          >
-            <Text
-              style={[
-                styles.langText,
-                { fontFamily: theme.fonts.arBold },
-                lang === 'ar' && styles.langTextActive,
-              ]}
+              <Text
+                style={[
+                  styles.langText,
+                  { fontFamily: fam },
+                  langPref === value && styles.langTextActive,
+                ]}
+              >
+                {text}
+              </Text>
+            </Pressy>
+          ))}
+        </View>
+
+        {/* Appearance */}
+        <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
+          {t('settings.appearance')}
+        </Text>
+        <Text style={[styles.sectionDesc, { fontFamily: font(lang, 'regular') }]}>
+          {t('settings.appearanceDesc')}
+        </Text>
+        <View style={styles.langRow}>
+          {([
+            ['dark', t('settings.themeDark')],
+            ['light', t('settings.themeLight')],
+            ['system', t('settings.themeSystem')],
+          ] as const).map(([value, text]) => (
+            <Pressy
+              key={value}
+              style={[styles.langChip, themeMode === value && styles.langChipActive]}
+              scaleTo={0.96}
+              onPress={() => chooseTheme(value)}
             >
-              {t('settings.arabic')}
-            </Text>
-          </Pressy>
+              <Text
+                style={[
+                  styles.langText,
+                  { fontFamily: font(lang, 'bold') },
+                  themeMode === value && styles.langTextActive,
+                ]}
+              >
+                {text}
+              </Text>
+            </Pressy>
+          ))}
+        </View>
+
+        {/* Calendar & stats prefs */}
+        <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
+          {t('settings.weekStart')}
+        </Text>
+        <View style={styles.langRow}>
+          {([
+            ['sun', t('settings.weekSunday')],
+            ['mon', t('settings.weekMonday')],
+          ] as const).map(([value, text]) => (
+            <Pressy
+              key={value}
+              style={[styles.langChip, weekStart === value && styles.langChipActive]}
+              scaleTo={0.96}
+              onPress={() => chooseWeekStart(value)}
+            >
+              <Text
+                style={[
+                  styles.langText,
+                  { fontFamily: font(lang, 'bold') },
+                  weekStart === value && styles.langTextActive,
+                ]}
+              >
+                {text}
+              </Text>
+            </Pressy>
+          ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, { fontFamily: font(lang, 'bold') }]}>
+          {t('settings.defaultRange')}
+        </Text>
+        <View style={styles.langRow}>
+          {[7, 14, 30].map((days) => (
+            <Pressy
+              key={days}
+              style={[styles.langChip, defaultRange === days && styles.langChipActive]}
+              scaleTo={0.96}
+              onPress={() => chooseDefaultRange(days)}
+            >
+              <Text
+                style={[
+                  styles.langText,
+                  { fontFamily: font(lang, 'bold') },
+                  defaultRange === days && styles.langTextActive,
+                ]}
+              >
+                {t('stats.days', { count: days })}
+              </Text>
+            </Pressy>
+          ))}
         </View>
 
         {/* Haptics */}
@@ -360,6 +474,30 @@ export function SettingsScreen() {
                 {t('settings.importDesc')}
               </Text>
             </View>
+          </View>
+        </Pressy>
+
+        <Pressy
+          style={[styles.card, { marginTop: theme.spacing.lg }]}
+          scaleTo={0.98}
+          onPress={() => {
+            haptics.selection();
+            router.push('/about');
+          }}
+        >
+          <View style={styles.row}>
+            <Ionicons name="information-circle-outline" size={24} color={theme.colors.accent} />
+            <View style={styles.rowText}>
+              <Text style={[styles.rowTitle, { fontFamily: font(lang, 'bold') }]}>
+                {t('settings.aboutTitle')}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={theme.colors.inkFaint}
+              style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
+            />
           </View>
         </Pressy>
 

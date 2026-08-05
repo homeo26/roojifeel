@@ -70,7 +70,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBar} />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -81,6 +81,10 @@ export default function RootLayout() {
         <Stack.Screen
           name="onboarding"
           options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="about"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom', animationDuration: 250 }}
         />
         <Stack.Screen
           name="wheel"

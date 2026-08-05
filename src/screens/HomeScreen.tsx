@@ -707,13 +707,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   flowCellEmpty: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: theme.o(0.05),
     height: 12,
     borderRadius: 4,
   },
   flowCellToday: {
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
+    borderColor: theme.o(0.55),
   },
   flowEmoji: {
     fontSize: 12,

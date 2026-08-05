@@ -342,7 +342,7 @@ export default function LogScreen() {
                 key={i}
                 style={[
                   styles.segment,
-                  { backgroundColor: i <= step ? accent : 'rgba(255,255,255,0.10)' },
+                  { backgroundColor: i <= step ? accent : theme.o(0.10) },
                 ]}
               />
             ))}
@@ -890,7 +890,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: theme.o(0.04),
     borderWidth: 1,
     borderColor: theme.colors.border,
   },

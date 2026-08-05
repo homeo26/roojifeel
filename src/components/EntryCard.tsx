@@ -113,7 +113,7 @@ export function EntryCard({
                         key={d}
                         style={[
                           styles.intensityDot,
-                          { backgroundColor: d <= (entry.intensity ?? 0) ? c.color : 'rgba(255,255,255,0.12)' },
+                          { backgroundColor: d <= (entry.intensity ?? 0) ? c.color : theme.o(0.12) },
                         ]}
                       />
                     ))}
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: theme.colors.borderBright,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: theme.o(0.05),
   },
   editedTagText: {
     fontSize: 9,

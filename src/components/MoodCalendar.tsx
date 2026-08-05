@@ -9,6 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { FeelingEntry, getEntriesBetween } from '../db';
 import { getCore, label as feelingLabel } from '../data/feelings';
 import { CoreLegend } from './CoreLegend';
+import { WeekStart, getWeekStart } from '../prefs';
 import { theme, font } from '../theme';
 import * as haptics from '../haptics';
 import { Pressy } from './Pressy';
@@ -23,6 +24,11 @@ export function MoodCalendar() {
   const [month, setMonth] = useState(now.getMonth());
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [weekStart, setWeekStartState] = useState<WeekStart>('mon');
+
+  useEffect(() => {
+    getWeekStart().then(setWeekStartState);
+  }, []);
 
   const monthStart = new Date(year, month, 1).getTime();
   const monthEnd = new Date(year, month + 1, 1).getTime() - 1;
@@ -65,17 +71,20 @@ export function MoodCalendar() {
   }, [entries]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  // Monday-first offset of the 1st.
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+  // Offset of the 1st, respecting the week-start preference.
+  const firstWeekday =
+    weekStart === 'sun'
+      ? new Date(year, month, 1).getDay()
+      : (new Date(year, month, 1).getDay() + 6) % 7;
 
   const weekdayNames = useMemo(() => {
-    const base = new Date(2024, 0, 1); // a Monday
+    const base = weekStart === 'sun' ? new Date(2023, 11, 31) : new Date(2024, 0, 1); // Sunday or Monday
     return new Array(7).fill(0).map((_, i) =>
       new Date(base.getTime() + i * DAY_MS).toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
         weekday: 'narrow',
       }),
     );
-  }, [lang]);
+  }, [lang, weekStart]);
 
   const monthLabel = new Date(year, month, 1).toLocaleDateString(
     lang === 'ar' ? 'ar' : 'en-GB',
@@ -256,7 +265,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: theme.o(0.04),
   },
   dayDetailEmoji: {
     fontSize: 16,
