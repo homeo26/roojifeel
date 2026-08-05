@@ -58,7 +58,10 @@ interface Segment {
   lx: number;
   ly: number;
   lrot: number;
-  lsize: number;
+  /** Available radial length for the label, px. */
+  lavail: number;
+  /** Max font size for this ring. */
+  lmax: number;
   lcolor: string;
 }
 
@@ -91,12 +94,8 @@ function radialLabel(midAngle: number, radius: number) {
   return { x: pos.x, y: pos.y, rot };
 }
 
-function buildSegments(): {
-  segments: Segment[];
-  coreCenters: Array<{ coreId: string; emoji: string; x: number; y: number }>;
-} {
+function buildSegments(): { segments: Segment[] } {
   const segments: Segment[] = [];
-  const coreCenters: Array<{ coreId: string; emoji: string; x: number; y: number }> = [];
   const leafCount = (c: CoreFeeling) =>
     c.children.reduce((sum, s) => sum + (s.children?.length ?? 0), 0);
   const totalLeaves = FEELINGS_WHEEL.reduce((sum, c) => sum + leafCount(c), 0);
@@ -105,7 +104,7 @@ function buildSegments(): {
   for (const core of FEELINGS_WHEEL) {
     const span = (leafCount(core) / totalLeaves) * 360;
     const coreMid = angle + span / 2;
-    const coreLabel = radialLabel(coreMid, R * (R_CORE - 0.065));
+    const coreLabel = radialLabel(coreMid, R * ((R_HOLE + R_CORE) / 2));
     segments.push({
       path: sector(R * R_HOLE, R * R_CORE - 1.5, angle + 0.6, angle + span - 0.6),
       color: core.color,
@@ -115,11 +114,10 @@ function buildSegments(): {
       lx: coreLabel.x,
       ly: coreLabel.y,
       lrot: coreLabel.rot,
-      lsize: 13,
+      lavail: R * (R_CORE - R_HOLE) - 12,
+      lmax: 13,
       lcolor: '#FFFFFF',
     });
-    const emojiPos = polar(CX, CY, R * (R_HOLE + 0.06), coreMid);
-    coreCenters.push({ coreId: core.id, emoji: core.emoji, x: emojiPos.x, y: emojiPos.y });
 
     let secAngle = angle;
     for (const sec of core.children) {
@@ -135,7 +133,8 @@ function buildSegments(): {
         lx: secLbl.x,
         ly: secLbl.y,
         lrot: secLbl.rot,
-        lsize: 9.5,
+        lavail: R * (R_SEC - R_CORE) - 10,
+        lmax: 10,
         lcolor: '#FFFFFF',
       });
       let tertAngle = secAngle;
@@ -153,7 +152,8 @@ function buildSegments(): {
           lx: tertLbl.x,
           ly: tertLbl.y,
           lrot: tertLbl.rot,
-          lsize: 7.5,
+          lavail: R * (R_TERT - R_SEC) - 8,
+          lmax: 8,
           lcolor: 'rgba(255,255,255,0.95)',
         });
         tertAngle += tertSpan;
@@ -162,7 +162,13 @@ function buildSegments(): {
     }
     angle += span;
   }
-  return { segments, coreCenters };
+  return { segments };
+}
+
+/** Shrink the font until the text fits its radial slot (rough width model). */
+function fitSize(text: string, availPx: number, maxSize: number): number {
+  const est = 0.62 * Math.max(text.length, 1);
+  return Math.max(5, Math.min(maxSize, availPx / est));
 }
 
 export default function WheelScreen() {
@@ -173,7 +179,7 @@ export default function WheelScreen() {
   const { zoom } = useLocalSearchParams<{ zoom?: string }>();
   const [zoomed, setZoomed] = useState(false);
 
-  const { segments, coreCenters } = useMemo(buildSegments, []);
+  const { segments } = useMemo(buildSegments, []);
 
   // Spin + zoom physics
   const rotation = useSharedValue(0);
@@ -331,7 +337,7 @@ export default function WheelScreen() {
                     fill={seg.lcolor}
                     stroke="rgba(0,0,0,0.35)"
                     strokeWidth={0.35}
-                    fontSize={seg.lsize}
+                    fontSize={fitSize(label(seg.node, lang), seg.lavail, seg.lmax)}
                     fontWeight="bold"
                     textAnchor="middle"
                     alignmentBaseline="middle"
@@ -345,16 +351,6 @@ export default function WheelScreen() {
                 ))}
               </G>
             </Svg>
-            {/* Core emojis */}
-            {coreCenters.map((c) => (
-              <View
-                key={c.coreId}
-                pointerEvents="none"
-                style={[styles.coreEmojiWrap, { left: c.x - 11, top: c.y - 11 }]}
-              >
-                <Text style={styles.coreEmoji}>{c.emoji}</Text>
-              </View>
-            ))}
             {/* Center logo */}
             <View pointerEvents="none" style={styles.centerLogoWrap}>
               <Image
@@ -448,16 +444,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  coreEmojiWrap: {
-    position: 'absolute',
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coreEmoji: {
-    fontSize: 15,
   },
   centerLogoWrap: {
     position: 'absolute',
