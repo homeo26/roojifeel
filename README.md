@@ -19,7 +19,8 @@ Everything stays on your device. Nothing is ever uploaded.
   (7 cores → 41 branches → 130+ exact feelings), each in its authentic color
 - **Multiple feelings per check-in** — real moments are mixed
 - **Intensity slider** (1–5), **tags** (#work, #family…) with suggestions,
-  **photo attachments** (camera or library), and **voice memos**
+  **photo attachments** (camera or library), and **voice memos** recorded
+  with a live Messenger-style waveform
 - **Quick-log mood orbs** on Home — one tap opens the wheel at that core
 
 ### The Feelings Wheel explorer
@@ -32,7 +33,8 @@ Everything stays on your device. Nothing is ever uploaded.
   positivity gauges, daily activity, time-of-day and weekday breakdowns,
   per-core branch drill-down, top feelings
 - **Kibana-style time ranges** — quick presets or absolute from/to dates
-- **Mood calendar** — each day tinted by its dominant feeling
+- **Mood calendar** — each day tinted by its dominant feeling, with a
+  color legend and tappable days ("Day 5 — mostly Happy · 3 check-ins")
 - **Trends** — 12-week positivity % and average-intensity lines with
   moving averages
 - **Monthly Wrapped ✨** — a shareable summary card of your month
@@ -45,6 +47,13 @@ Everything stays on your device. Nothing is ever uploaded.
   celebration; **30 rotating daily reflection prompts**
 - **First-launch onboarding** — the wheel, the privacy promise, reminders
 
+### Share & keep
+- **Share as text** — one entry or a multi-selection, neatly templated
+  (feeling path, date, intensity dots, note, #tags) through the system
+  share sheet
+- **Pinned memory widget 📌** — pin a cherished entry to your home screen
+  on Android and iOS
+
 ### Yours alone
 - **100% on-device** — SQLite storage, no accounts, no servers, no analytics
 - **Auto-backup** to storage *you* own (Files app on iOS, any folder on
@@ -52,8 +61,11 @@ Everything stays on your device. Nothing is ever uploaded.
 - **English + العربية** with full RTL, instant switching
 - **Home-screen widgets** on both Android and iOS — today's mood and a
   one-tap log button
-- **Optional haptics**, dark glassy design, Space Grotesk + Manrope +
-  IBM Plex Sans Arabic
+- **Dark & light themes** (or follow the system), a living animated
+  backdrop, optional haptics, Space Grotesk + Manrope + IBM Plex Sans
+  Arabic typography
+- **Make it yours** — week start day, default stats range, system-language
+  follow, and an About page with the privacy manifesto
 
 ## Install
 
