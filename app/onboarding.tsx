@@ -7,6 +7,7 @@
 import React, { useRef, useState } from 'react';
 import {
   Dimensions,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +21,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { FEELINGS_WHEEL } from '../src/data/feelings';
 import { ReminderTime, applyReminders, requestNotificationPermission } from '../src/notifications';
 import { theme, font, displayFont } from '../src/theme';
 import * as haptics from '../src/haptics';
@@ -93,23 +93,8 @@ export default function OnboardingScreen() {
         {/* Page 1 — the wheel */}
         <View style={styles.page}>
           <Animated.View entering={FadeIn.duration(400)} style={styles.pageBody}>
-            <View style={styles.orbCluster}>
-              {FEELINGS_WHEEL.map((c, i) => (
-                <View
-                  key={c.id}
-                  style={[
-                    styles.clusterOrb,
-                    {
-                      backgroundColor: c.tint,
-                      borderColor: c.color,
-                      shadowColor: c.color,
-                      transform: [{ translateY: i % 2 === 0 ? 0 : 16 }],
-                    },
-                  ]}
-                >
-                  <Text style={styles.clusterEmoji}>{c.emoji}</Text>
-                </View>
-              ))}
+            <View style={styles.logoGlow}>
+              <Image source={require('../assets/logo-circle.png')} style={styles.logo} />
             </View>
             <Text style={[styles.title, { fontFamily: displayFont(lang) }]}>
               {t('onboarding.title1')}
@@ -231,25 +216,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: theme.spacing.md,
   },
-  orbCluster: {
-    flexDirection: 'row',
-    gap: 6,
+  logoGlow: {
     marginBottom: theme.spacing.md,
-  },
-  clusterOrb: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
+    shadowColor: theme.colors.purple,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.55,
+    shadowRadius: 28,
+    elevation: 10,
   },
-  clusterEmoji: {
-    fontSize: 19,
+  logo: {
+    width: 156,
+    height: 156,
   },
   lockCircle: {
     width: 96,

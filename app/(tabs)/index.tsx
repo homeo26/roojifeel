@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -163,15 +163,18 @@ export default function HomeScreen() {
           <View>
             {/* Hero */}
             <Animated.View entering={fade()}>
-              <View style={styles.dateRow}>
-                <View style={styles.dateDot} />
-                <Text style={[styles.dateText, { fontFamily: font(lang, 'semibold') }]}>
-                  {new Date().toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                  })}
-                </Text>
+              <View style={styles.heroTopRow}>
+                <View style={styles.dateRow}>
+                  <View style={styles.dateDot} />
+                  <Text style={[styles.dateText, { fontFamily: font(lang, 'semibold') }]}>
+                    {new Date().toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                    })}
+                  </Text>
+                </View>
+                <Image source={require('../../assets/logo-circle.png')} style={styles.heroLogo} />
               </View>
               <Text style={[styles.greeting, { fontFamily: displayFont(lang) }]}>
                 {t(`home.${greetingKey}`)}
@@ -538,11 +541,20 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xl,
   },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: theme.spacing.md,
+  },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: theme.spacing.md,
+  },
+  heroLogo: {
+    width: 44,
+    height: 44,
   },
   dateDot: {
     width: 7,
