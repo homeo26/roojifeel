@@ -57,7 +57,7 @@ export default function LogScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const router = useRouter();
-  const { editId, coreId } = useLocalSearchParams<{ editId?: string; coreId?: string }>();
+  const { editId, coreId, secondaryId, tertiaryId } = useLocalSearchParams<{ editId?: string; coreId?: string; secondaryId?: string; tertiaryId?: string }>();
   const editingId = editId ? Number(editId) : null;
 
   const [step, setStep] = useState<Step>(0);
@@ -103,15 +103,22 @@ export default function LogScreen() {
     });
   }, [editingId]);
 
-  // Quick-log: a core was chosen on the home screen.
+  // Quick-log: a core (or a full wheel path) was chosen elsewhere.
   useEffect(() => {
     if (editingId != null || !coreId) return;
     const c = getCore(coreId);
-    if (c) {
-      setCore(c);
-      setStep(1);
+    if (!c) return;
+    // Full path from the wheel explorer → add the feeling, go to details.
+    if (secondaryId && tertiaryId && getTertiary(coreId, secondaryId, tertiaryId)) {
+      setFeelings((prev) =>
+        prev.length === 0 ? [{ coreId, secondaryId, tertiaryId }] : prev,
+      );
+      setStep(3);
+      return;
     }
-  }, [coreId, editingId]);
+    setCore(c);
+    setStep(1);
+  }, [coreId, secondaryId, tertiaryId, editingId]);
 
   const stepTitle = [
     feelings.length > 0 ? t('log.stepCoreAnother') : t('log.stepCore'),

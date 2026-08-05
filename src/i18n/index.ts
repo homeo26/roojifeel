@@ -66,6 +66,8 @@ const en = {
       prompt29: "What did you learn about yourself this week, however small?",
       prompt30: "If you could send one sentence to yourself this morning, what would it say?",
       quickLog: 'In one tap — how do you feel?',
+      exploreWheel: 'Explore the wheel',
+      exploreWheelSub: 'Spin through every feeling you can name',
       insightTitle: 'This week you mostly felt',
       viewAll: 'View all',
       nextMilestone: 'next: {{next}} days',
@@ -221,6 +223,12 @@ const en = {
       restartForRTL: 'Please restart the app to fully apply the layout direction.',
       about: 'Roojifeel keeps every feeling on your device. Nothing is uploaded, ever.',
     },
+    wheel: {
+      title: 'The feelings wheel',
+      hint: 'Spin the wheel · tap any segment',
+      tapPrompt: 'Tap a segment to discover its feeling',
+      logThis: 'Log this',
+    },
     wrapped: {
       eyebrow: 'Your month in feelings',
       dominant: 'You mostly felt',
@@ -305,6 +313,8 @@ const ar = {
       prompt29: "ماذا تعلمت عن نفسك هذا الأسبوع، مهما كان صغيراً؟",
       prompt30: "لو أرسلت جملة واحدة لنفسك صباح اليوم، ماذا ستقول؟",
       quickLog: 'بلمسة واحدة — بماذا تشعر؟',
+      exploreWheel: 'استكشف العجلة',
+      exploreWheelSub: 'دُر بين كل شعور يمكنك تسميته',
       insightTitle: 'هذا الأسبوع شعرت غالباً بـ',
       viewAll: 'عرض الكل',
       nextMilestone: 'التالي: {{next}} أيام',
@@ -477,6 +487,12 @@ const ar = {
       permissionDenied: 'الإشعارات معطلة. فعّلها من إعدادات النظام.',
       restartForRTL: 'يرجى إعادة تشغيل التطبيق لتطبيق اتجاه الواجهة كاملاً.',
       about: 'روجيفيل يحفظ كل شعور على جهازك. لا يُرفع أي شيء أبداً.',
+    },
+    wheel: {
+      title: 'عجلة المشاعر',
+      hint: 'دوّر العجلة · اضغط أي جزء',
+      tapPrompt: 'اضغط جزءاً لتكتشف شعوره',
+      logThis: 'سجّله',
     },
     wrapped: {
       eyebrow: 'شهرك في مشاعر',

@@ -83,6 +83,10 @@ export default function RootLayout() {
           options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}
         />
         <Stack.Screen
+          name="wheel"
+          options={{ presentation: 'fullScreenModal', animation: 'fade', animationDuration: 250 }}
+        />
+        <Stack.Screen
           name="wrapped"
           options={{ presentation: 'modal', animation: 'slide_from_bottom', animationDuration: 250 }}
         />

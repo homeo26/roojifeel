@@ -261,6 +261,33 @@ export default function HomeScreen() {
               </ScrollView>
             </Animated.View>
 
+            {/* Explore the wheel */}
+            <Animated.View entering={fade(50)}>
+              <Pressable
+                style={({ pressed }) => [styles.wheelCard, pressed && styles.pressedCard]}
+                onPress={() => {
+                  haptics.selection();
+                  router.push('/wheel');
+                }}
+              >
+                <Image source={require('../../assets/logo-circle.png')} style={styles.wheelCardLogo} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.wheelCardTitle, { fontFamily: font(lang, 'bold') }]}>
+                    {t('home.exploreWheel')}
+                  </Text>
+                  <Text style={[styles.wheelCardSub, { fontFamily: font(lang, 'regular') }]}>
+                    {t('home.exploreWheelSub')}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={theme.colors.inkFaint}
+                  style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
+                />
+              </Pressable>
+            </Animated.View>
+
             {/* Stat tiles → stats tab */}
             <Animated.View entering={fade(60)} style={styles.statRow}>
               {[
@@ -770,6 +797,32 @@ const styles = StyleSheet.create({
   },
   quickName: {
     fontSize: 12,
+  },
+  wheelCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.35)',
+    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+  },
+  wheelCardLogo: {
+    width: 38,
+    height: 38,
+  },
+  wheelCardTitle: {
+    fontSize: 15,
+    color: theme.colors.ink,
+    textAlign: 'left',
+  },
+  wheelCardSub: {
+    fontSize: 12,
+    color: theme.colors.inkSoft,
+    marginTop: 1,
+    textAlign: 'left',
   },
   pressedCard: {
     opacity: 0.75,
