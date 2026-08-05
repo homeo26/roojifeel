@@ -35,7 +35,7 @@ echo "==> iOS unsigned device IPA"
 DERIVED="/tmp/roojifeel-release-derived"
 (cd ios && xcodebuild -workspace Roojifeel.xcworkspace -scheme Roojifeel \
   -configuration Release -destination 'generic/platform=iOS' \
-  -derivedDataPath "$DERIVED" build CODE_SIGNING_ALLOWED=NO >/dev/null)
+  -derivedDataPath "$DERIVED" build CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO >/dev/null)
 STAGE=$(mktemp -d)
 mkdir -p "$STAGE/Payload"
 cp -R "$DERIVED/Build/Products/Release-iphoneos/Roojifeel.app" "$STAGE/Payload/"
