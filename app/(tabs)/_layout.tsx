@@ -44,7 +44,7 @@ export default function TabsLayout() {
           tabBar={(props) => <TabBar {...props} />}
           screenOptions={{
             headerShown: false,
-            animation: 'fade',
+            animation: 'shift',
             transitionSpec: {
               animation: 'timing',
               config: { duration: theme.motion.base },
