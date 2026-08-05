@@ -87,8 +87,15 @@ export default function OnboardingScreen() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        scrollEnabled={false}
+        style={{ direction: 'ltr' }}
         contentContainerStyle={{ width: SCREEN_W * 3 }}
+        onMomentumScrollEnd={(e) => {
+          const p = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+          if (p !== page) {
+            haptics.selection();
+            setPage(p);
+          }
+        }}
       >
         {/* Page 1 — the wheel */}
         <View style={styles.page}>

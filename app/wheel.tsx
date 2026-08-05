@@ -8,7 +8,7 @@ import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { G, Path } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -327,30 +327,41 @@ export default function WheelScreen() {
                   />
                 ) : null}
               </G>
-              {/* Labels */}
-              <G pointerEvents="none">
-                {segments.map((seg) => (
-                  <SvgText
-                    key={`lbl-${seg.key}`}
-                    x={seg.lx}
-                    y={seg.ly}
-                    fill={seg.lcolor}
-                    stroke="rgba(0,0,0,0.35)"
-                    strokeWidth={0.35}
-                    fontSize={fitSize(label(seg.node, lang), seg.lavail, seg.lmax)}
-                    fontWeight="bold"
-                    textAnchor="middle"
-                    alignmentBaseline="middle"
-                    transform={`rotate(${seg.lrot.toFixed(1)}, ${seg.lx.toFixed(1)}, ${seg.ly.toFixed(1)})`}
-                    opacity={
-                      selected == null ? 1 : selected.coreId === seg.coreId ? 1 : 0.35
-                    }
-                  >
-                    {label(seg.node, lang)}
-                  </SvgText>
-                ))}
-              </G>
             </Svg>
+            {/* Labels — RN Text so Arabic shapes correctly and app fonts apply */}
+            {segments.map((seg) => {
+              const text = label(seg.node, lang);
+              return (
+                <View
+                  key={`lbl-${seg.key}`}
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: seg.lx - seg.lavail / 2,
+                    top: seg.ly - 9,
+                    width: seg.lavail,
+                    height: 18,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: [{ rotate: `${seg.lrot}deg` }],
+                    opacity: selected == null ? 1 : selected.coreId === seg.coreId ? 1 : 0.35,
+                  }}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontFamily: font(lang, 'bold'),
+                      fontSize: fitSize(text, seg.lavail, seg.lmax),
+                      color: seg.lcolor,
+                      textShadowColor: 'rgba(0,0,0,0.45)',
+                      textShadowRadius: 2,
+                    }}
+                  >
+                    {text}
+                  </Text>
+                </View>
+              );
+            })}
             {/* Center logo */}
             <View pointerEvents="none" style={styles.centerLogoWrap}>
               <Image
