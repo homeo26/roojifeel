@@ -1,38 +1,49 @@
 /**
- * The Feelings Wheel — a fullscreen, spinnable rendition of the classic
- * three-ring wheel. Drag to spin (with inertia), tap any segment to see
- * its path, and log the selected feeling in one tap.
+ * The Feelings Wheel — a fullscreen, spinnable, zoomable rendition of the
+ * classic three-ring wheel. Drag to spin (inertia), pinch to zoom (centered),
+ * tap any segment: it pops with an animated highlight and a selection card.
  */
 import React, { useMemo, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import Svg, { G, Path } from 'react-native-svg';
+import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
   FadeInDown,
+  ZoomIn,
   useAnimatedStyle,
   useSharedValue,
   withDecay,
+  withTiming,
+  useDerivedValue,
+  runOnJS,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { CoreFeeling, FEELINGS_WHEEL, getCore, getSecondary, getTertiary, label } from '../src/data/feelings';
+import {
+  CoreFeeling,
+  FEELINGS_WHEEL,
+  FeelingNode,
+  getCore,
+  getSecondary,
+  getTertiary,
+  label,
+} from '../src/data/feelings';
 import { theme, font, displayFont } from '../src/theme';
 import * as haptics from '../src/haptics';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const WHEEL_SIZE = SCREEN_W - 24;
+const WHEEL_SIZE = SCREEN_W - 16;
 const R = WHEEL_SIZE / 2;
 const CX = R;
 const CY = R;
 
-// Ring radii (fractions of R)
-const R_HOLE = 0.17;
-const R_CORE = 0.44;
-const R_SEC = 0.72;
+const R_HOLE = 0.15;
+const R_CORE = 0.40;
+const R_SEC = 0.70;
 const R_TERT = 0.99;
 
 interface Segment {
@@ -42,6 +53,13 @@ interface Segment {
   secondaryId?: string;
   tertiaryId?: string;
   key: string;
+  node: FeelingNode;
+  // Label placement
+  lx: number;
+  ly: number;
+  lrot: number;
+  lsize: number;
+  lcolor: string;
 }
 
 function polar(cx: number, cy: number, r: number, deg: number) {
@@ -49,7 +67,6 @@ function polar(cx: number, cy: number, r: number, deg: number) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-/** Annular sector path between radii r0..r1 and angles a0..a1 (degrees). */
 function sector(r0: number, r1: number, a0: number, a1: number): string {
   const large = a1 - a0 > 180 ? 1 : 0;
   const p1 = polar(CX, CY, r1, a0);
@@ -65,8 +82,19 @@ function sector(r0: number, r1: number, a0: number, a1: number): string {
   ].join(' ');
 }
 
-/** Build every wheel segment with angular spans proportional to leaf count. */
-function buildSegments(): { segments: Segment[]; coreCenters: Array<{ coreId: string; emoji: string; x: number; y: number }> } {
+/** Radial label transform: text runs along the radius, kept upright. */
+function radialLabel(midAngle: number, radius: number) {
+  const pos = polar(CX, CY, radius, midAngle);
+  // Rotate text to lie along the radius; flip on the left half so it reads outward.
+  let rot = midAngle - 90;
+  if (midAngle > 180) rot = midAngle + 90;
+  return { x: pos.x, y: pos.y, rot };
+}
+
+function buildSegments(): {
+  segments: Segment[];
+  coreCenters: Array<{ coreId: string; emoji: string; x: number; y: number }>;
+} {
   const segments: Segment[] = [];
   const coreCenters: Array<{ coreId: string; emoji: string; x: number; y: number }> = [];
   const leafCount = (c: CoreFeeling) =>
@@ -76,28 +104,44 @@ function buildSegments(): { segments: Segment[]; coreCenters: Array<{ coreId: st
   let angle = 0;
   for (const core of FEELINGS_WHEEL) {
     const span = (leafCount(core) / totalLeaves) * 360;
+    const coreMid = angle + span / 2;
+    const coreLabel = radialLabel(coreMid, R * ((R_HOLE + R_CORE) / 2 + 0.035));
     segments.push({
       path: sector(R * R_HOLE, R * R_CORE - 1.5, angle + 0.6, angle + span - 0.6),
       color: core.color,
       coreId: core.id,
       key: core.id,
+      node: core,
+      lx: coreLabel.x,
+      ly: coreLabel.y,
+      lrot: coreLabel.rot,
+      lsize: 12,
+      lcolor: '#FFFFFF',
     });
-    const mid = polar(CX, CY, R * ((R_HOLE + R_CORE) / 2), angle + span / 2);
-    coreCenters.push({ coreId: core.id, emoji: core.emoji, x: mid.x, y: mid.y });
+    const emojiPos = polar(CX, CY, R * ((R_HOLE + R_CORE) / 2 - 0.055), coreMid);
+    coreCenters.push({ coreId: core.id, emoji: core.emoji, x: emojiPos.x, y: emojiPos.y });
 
     let secAngle = angle;
     for (const sec of core.children) {
       const secSpan = ((sec.children?.length ?? 0) / totalLeaves) * 360;
+      const secLbl = radialLabel(secAngle + secSpan / 2, R * ((R_CORE + R_SEC) / 2));
       segments.push({
         path: sector(R * R_CORE, R * R_SEC - 1.5, secAngle + 0.5, secAngle + secSpan - 0.5),
         color: core.colorMid,
         coreId: core.id,
         secondaryId: sec.id,
         key: `${core.id}/${sec.id}`,
+        node: sec,
+        lx: secLbl.x,
+        ly: secLbl.y,
+        lrot: secLbl.rot,
+        lsize: 8.5,
+        lcolor: '#FFFFFF',
       });
       let tertAngle = secAngle;
       for (const tert of sec.children ?? []) {
         const tertSpan = (1 / totalLeaves) * 360;
+        const tertLbl = radialLabel(tertAngle + tertSpan / 2, R * ((R_SEC + R_TERT) / 2));
         segments.push({
           path: sector(R * R_SEC, R * R_TERT, tertAngle + 0.45, tertAngle + tertSpan - 0.45),
           color: core.colorOuter,
@@ -105,6 +149,12 @@ function buildSegments(): { segments: Segment[]; coreCenters: Array<{ coreId: st
           secondaryId: sec.id,
           tertiaryId: tert.id,
           key: `${core.id}/${sec.id}/${tert.id}`,
+          node: tert,
+          lx: tertLbl.x,
+          ly: tertLbl.y,
+          lrot: tertLbl.rot,
+          lsize: 6.5,
+          lcolor: 'rgba(255,255,255,0.95)',
         });
         tertAngle += tertSpan;
       }
@@ -120,27 +170,33 @@ export default function WheelScreen() {
   const lang = i18n.language;
   const router = useRouter();
   const [selected, setSelected] = useState<Segment | null>(null);
+  const [zoomed, setZoomed] = useState(false);
 
   const { segments, coreCenters } = useMemo(buildSegments, []);
 
-  // Spin physics
+  // Spin + zoom physics
   const rotation = useSharedValue(0);
   const startRotation = useSharedValue(0);
   const startTouchAngle = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const startScale = useSharedValue(1);
+
+  useDerivedValue(() => {
+    runOnJS(setZoomed)(scale.value > 1.08);
+  });
 
   const pan = Gesture.Pan()
     .minDistance(10)
+    .maxPointers(1)
     .onStart((e) => {
       startRotation.value = rotation.value;
-      startTouchAngle.value =
-        (Math.atan2(e.y - CY, e.x - CX) * 180) / Math.PI;
+      startTouchAngle.value = (Math.atan2(e.y - CY, e.x - CX) * 180) / Math.PI;
     })
     .onUpdate((e) => {
       const a = (Math.atan2(e.y - CY, e.x - CX) * 180) / Math.PI;
       rotation.value = startRotation.value + (a - startTouchAngle.value);
     })
     .onEnd((e) => {
-      // Tangential velocity → angular velocity (deg/s)
       const dx = e.x - CX;
       const dy = e.y - CY;
       const r2 = Math.max(dx * dx + dy * dy, 400);
@@ -148,9 +204,25 @@ export default function WheelScreen() {
       rotation.value = withDecay({ velocity: omega, deceleration: 0.9985 });
     });
 
+  const pinch = Gesture.Pinch()
+    .onStart(() => {
+      startScale.value = scale.value;
+    })
+    .onUpdate((e) => {
+      const next = startScale.value * e.scale;
+      scale.value = Math.min(Math.max(next, 1), 3.2);
+    });
+
+  const gestures = Gesture.Simultaneous(pan, pinch);
+
   const wheelStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
+    transform: [{ scale: scale.value }, { rotate: `${rotation.value}deg` }],
   }));
+
+  const resetZoom = () => {
+    haptics.selection();
+    scale.value = withTiming(1, { duration: 280, easing: theme.motion.easing });
+  };
 
   const onSelect = (seg: Segment) => {
     haptics.selection();
@@ -191,13 +263,19 @@ export default function WheelScreen() {
           <Ionicons name="close" size={24} color={theme.colors.ink} />
         </Pressable>
         <Text style={[styles.title, { fontFamily: displayFont(lang) }]}>{t('wheel.title')}</Text>
-        <View style={styles.headerBtn} />
+        <View style={styles.headerBtn}>
+          {zoomed ? (
+            <Pressable onPress={resetZoom} hitSlop={10}>
+              <Ionicons name="contract-outline" size={20} color={theme.colors.inkSoft} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       <Text style={[styles.hint, { fontFamily: font(lang, 'regular') }]}>{t('wheel.hint')}</Text>
 
       {/* The wheel */}
       <View style={styles.wheelWrap}>
-        <GestureDetector gesture={pan}>
+        <GestureDetector gesture={gestures}>
           <Animated.View style={[{ width: WHEEL_SIZE, height: WHEEL_SIZE }, wheelStyle]}>
             <Svg width={WHEEL_SIZE} height={WHEEL_SIZE}>
               <G>
@@ -212,13 +290,43 @@ export default function WheelScreen() {
                         : selected.key === seg.key
                           ? 1
                           : selected.coreId === seg.coreId
-                            ? 0.75
-                            : 0.28
+                            ? 0.8
+                            : 0.3
                     }
-                    stroke={selected?.key === seg.key ? '#FFFFFF' : 'transparent'}
-                    strokeWidth={selected?.key === seg.key ? 2 : 0}
                     onPress={() => onSelect(seg)}
                   />
+                ))}
+                {/* Animated highlight overlay for the selected segment */}
+                {selected ? (
+                  <Path
+                    key={`hl-${selected.key}`}
+                    d={selected.path}
+                    fill="transparent"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.5}
+                    pointerEvents="none"
+                  />
+                ) : null}
+              </G>
+              {/* Labels */}
+              <G pointerEvents="none">
+                {segments.map((seg) => (
+                  <SvgText
+                    key={`lbl-${seg.key}`}
+                    x={seg.lx}
+                    y={seg.ly}
+                    fill={seg.lcolor}
+                    fontSize={seg.lsize}
+                    fontWeight={seg.tertiaryId ? '500' : 'bold'}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    transform={`rotate(${seg.lrot.toFixed(1)}, ${seg.lx.toFixed(1)}, ${seg.ly.toFixed(1)})`}
+                    opacity={
+                      selected == null ? 1 : selected.coreId === seg.coreId ? 1 : 0.35
+                    }
+                  >
+                    {label(seg.node, lang)}
+                  </SvgText>
                 ))}
               </G>
             </Svg>
@@ -227,7 +335,7 @@ export default function WheelScreen() {
               <View
                 key={c.coreId}
                 pointerEvents="none"
-                style={[styles.coreEmojiWrap, { left: c.x - 13, top: c.y - 13 }]}
+                style={[styles.coreEmojiWrap, { left: c.x - 11, top: c.y - 11 }]}
               >
                 <Text style={styles.coreEmoji}>{c.emoji}</Text>
               </View>
@@ -236,23 +344,32 @@ export default function WheelScreen() {
             <View pointerEvents="none" style={styles.centerLogoWrap}>
               <Image
                 source={require('../assets/logo-circle.png')}
-                style={{ width: R * R_HOLE * 2 - 14, height: R * R_HOLE * 2 - 14 }}
+                style={{ width: R * R_HOLE * 2 - 12, height: R * R_HOLE * 2 - 12 }}
               />
             </View>
           </Animated.View>
         </GestureDetector>
       </View>
 
-      {/* Selection card */}
+      {/* Selection card — re-keyed so every selection animates in */}
       {selected && core ? (
-        <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+        <Animated.View
+          key={selected.key}
+          entering={FadeInDown.duration(220).springify().damping(18)}
+          style={styles.card}
+        >
           <View style={[styles.cardStripe, { backgroundColor: core.color }]} />
+          <Animated.View entering={ZoomIn.delay(60).duration(180)} style={styles.cardEmojiWrap}>
+            <Text style={styles.cardEmoji}>{core.emoji}</Text>
+          </Animated.View>
           <View style={styles.cardBody}>
             <Text style={[styles.cardPath, { fontFamily: font(lang, 'semibold') }]}>
-              {core.emoji} {label(core, lang)}
+              {label(core, lang)}
               {secondary ? `  ›  ${label(secondary, lang)}` : ''}
             </Text>
-            <Text style={[styles.cardFeeling, { fontFamily: displayFont(lang), color: core.colorMid }]}>
+            <Text
+              style={[styles.cardFeeling, { fontFamily: displayFont(lang), color: core.colorMid }]}
+            >
               {tertiary ? label(tertiary, lang) : secondary ? label(secondary, lang) : label(core, lang)}
             </Text>
           </View>
@@ -319,13 +436,13 @@ const styles = StyleSheet.create({
   },
   coreEmojiWrap: {
     position: 'absolute',
-    width: 26,
-    height: 26,
+    width: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   coreEmoji: {
-    fontSize: 18,
+    fontSize: 15,
   },
   centerLogoWrap: {
     position: 'absolute',
@@ -339,7 +456,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     marginHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     backgroundColor: theme.colors.surfaceSolid,
@@ -356,6 +473,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 4,
   },
+  cardEmojiWrap: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardEmoji: {
+    fontSize: 26,
+  },
   cardBody: {
     flex: 1,
   },
@@ -365,9 +491,9 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   cardFeeling: {
-    fontSize: 24,
+    fontSize: 22,
     letterSpacing: -0.5,
-    marginTop: 2,
+    marginTop: 1,
     textAlign: 'left',
   },
   logBtn: {
