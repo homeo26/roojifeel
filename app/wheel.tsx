@@ -105,7 +105,7 @@ function buildSegments(): {
   for (const core of FEELINGS_WHEEL) {
     const span = (leafCount(core) / totalLeaves) * 360;
     const coreMid = angle + span / 2;
-    const coreLabel = radialLabel(coreMid, R * ((R_HOLE + R_CORE) / 2 + 0.035));
+    const coreLabel = radialLabel(coreMid, R * (R_CORE - 0.065));
     segments.push({
       path: sector(R * R_HOLE, R * R_CORE - 1.5, angle + 0.6, angle + span - 0.6),
       color: core.color,
@@ -115,10 +115,10 @@ function buildSegments(): {
       lx: coreLabel.x,
       ly: coreLabel.y,
       lrot: coreLabel.rot,
-      lsize: 12,
+      lsize: 13,
       lcolor: '#FFFFFF',
     });
-    const emojiPos = polar(CX, CY, R * ((R_HOLE + R_CORE) / 2 - 0.055), coreMid);
+    const emojiPos = polar(CX, CY, R * (R_HOLE + 0.06), coreMid);
     coreCenters.push({ coreId: core.id, emoji: core.emoji, x: emojiPos.x, y: emojiPos.y });
 
     let secAngle = angle;
@@ -135,7 +135,7 @@ function buildSegments(): {
         lx: secLbl.x,
         ly: secLbl.y,
         lrot: secLbl.rot,
-        lsize: 8.5,
+        lsize: 9.5,
         lcolor: '#FFFFFF',
       });
       let tertAngle = secAngle;
@@ -153,7 +153,7 @@ function buildSegments(): {
           lx: tertLbl.x,
           ly: tertLbl.y,
           lrot: tertLbl.rot,
-          lsize: 6.5,
+          lsize: 7.5,
           lcolor: 'rgba(255,255,255,0.95)',
         });
         tertAngle += tertSpan;
@@ -316,8 +316,10 @@ export default function WheelScreen() {
                     x={seg.lx}
                     y={seg.ly}
                     fill={seg.lcolor}
+                    stroke="rgba(0,0,0,0.35)"
+                    strokeWidth={0.35}
                     fontSize={seg.lsize}
-                    fontWeight={seg.tertiaryId ? '500' : 'bold'}
+                    fontWeight="bold"
                     textAnchor="middle"
                     alignmentBaseline="middle"
                     transform={`rotate(${seg.lrot.toFixed(1)}, ${seg.lx.toFixed(1)}, ${seg.ly.toFixed(1)})`}
