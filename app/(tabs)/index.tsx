@@ -286,7 +286,7 @@ export default function HomeScreen() {
                   style={({ pressed }) => [styles.statBox, pressed && styles.pressedCard]}
                   onPress={() => {
                     haptics.selection();
-                    router.push('/stats');
+                    router.navigate('/stats');
                   }}
                 >
                   <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
@@ -319,7 +319,7 @@ export default function HomeScreen() {
                   ]}
                   onPress={() => {
                     haptics.selection();
-                    router.push('/stats');
+                    router.navigate('/stats');
                   }}
                 >
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: weekTopCore.tint, borderRadius: theme.radius.md }]} />
@@ -350,7 +350,7 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.activityCard, pressed && styles.pressedCard]}
                 onPress={() => {
                   haptics.selection();
-                  router.push('/stats');
+                  router.navigate('/stats');
                 }}
               >
                 <Text style={[styles.cardLabel, { fontFamily: font(lang, 'semibold') }]}>
@@ -449,7 +449,7 @@ export default function HomeScreen() {
                   hitSlop={8}
                   onPress={() => {
                     haptics.selection();
-                    router.push('/history');
+                    router.navigate('/history');
                   }}
                 >
                   <Text style={[styles.viewAll, { fontFamily: font(lang, 'bold') }]}>
