@@ -45,6 +45,8 @@ import { FeelingPath, addEntry, deleteEntry, getAllEntries, getAllTags, getEntry
 import { deleteAttachment, isPersisted, persistAttachment } from '../src/attachments';
 import { syncSmartReminders } from '../src/notifications';
 import { shareEntries } from '../src/share';
+import { buildPinnedMemory, getPinnedMemory, setPinnedMemory } from '../src/widget/pinned';
+import { pushPinnedWidget } from '../src/widget/RoojifeelWidget';
 import { refreshWidget } from '../src/widget/RoojifeelWidget';
 import { theme, font } from '../src/theme';
 
@@ -76,6 +78,7 @@ export default function LogScreen() {
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
 
   // Voice memo recording/playback.
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -85,6 +88,30 @@ export default function LogScreen() {
   useEffect(() => {
     getAllTags().then(setTagSuggestions);
   }, []);
+
+  // Track whether this entry is the pinned memory.
+  useEffect(() => {
+    if (editingId == null) return;
+    getPinnedMemory().then((m) => setIsPinned(m?.entryId === editingId));
+  }, [editingId]);
+
+  const togglePin = async () => {
+    if (editingId == null) return;
+    haptics.selection();
+    if (isPinned) {
+      await setPinnedMemory(null);
+      await pushPinnedWidget(null, lang);
+      setIsPinned(false);
+    } else {
+      const entry = await getEntry(editingId);
+      if (!entry) return;
+      const memory = buildPinnedMemory(entry, lang);
+      await setPinnedMemory(memory);
+      await pushPinnedWidget(memory, lang);
+      setIsPinned(true);
+      haptics.success();
+    }
+  };
 
   // Edit mode: prefill from the existing entry and jump to details.
   useEffect(() => {
@@ -648,6 +675,27 @@ export default function LogScreen() {
             </Pressable>
             {editingId != null ? (
               <Pressable
+                style={({ pressed }) => [styles.pinBtn, isPinned && styles.pinBtnActive, pressed && styles.pressed]}
+                onPress={togglePin}
+              >
+                <Ionicons
+                  name={isPinned ? 'pin' : 'pin-outline'}
+                  size={18}
+                  color={isPinned ? theme.colors.purpleSoft : theme.colors.inkSoft}
+                />
+                <Text
+                  style={[
+                    styles.pinText,
+                    { fontFamily: font(lang, 'bold') },
+                    isPinned && { color: theme.colors.purpleSoft },
+                  ]}
+                >
+                  {isPinned ? t('log.unpin') : t('log.pin')}
+                </Text>
+              </Pressable>
+            ) : null}
+            {editingId != null ? (
+              <Pressable
                 style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
                 onPress={confirmDelete}
               >
@@ -943,6 +991,26 @@ const styles = StyleSheet.create({
   saveText: {
     color: '#FFFFFF',
     fontSize: 16,
+  },
+  pinBtn: {
+    marginTop: theme.spacing.sm + 4,
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.borderBright,
+    backgroundColor: theme.colors.surface,
+  },
+  pinBtnActive: {
+    borderColor: theme.colors.purple,
+    backgroundColor: 'rgba(124, 58, 237, 0.10)',
+  },
+  pinText: {
+    color: theme.colors.inkSoft,
+    fontSize: 15,
   },
   deleteBtn: {
     marginTop: theme.spacing.sm + 4,

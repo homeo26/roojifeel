@@ -15,6 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import { FeelingEntry } from '../db';
+import { PinnedMemoryWidget } from './PinnedMemoryWidget';
+import { PinnedMemory, getPinnedMemory } from './pinned';
 import { getCore } from '../data/feelings';
 
 const CACHE_KEY = 'roojifeel.widget.summary';
@@ -74,6 +76,41 @@ export async function refreshWidget(entries: FeelingEntry[], lang: string): Prom
       });
     } catch {
       // Widget module unavailable — ignore.
+    }
+  }
+
+  await pushPinnedWidget(await getPinnedMemory(), lang);
+}
+
+/** Push the pinned-memory widget content on both platforms. */
+export async function pushPinnedWidget(memory: PinnedMemory | null, lang: string): Promise<void> {
+  const ar = lang === 'ar';
+  if (Platform.OS === 'android') {
+    try {
+      const { requestWidgetUpdate } = await import('react-native-android-widget');
+      const { PinnedMemoryWidget } = await import('./PinnedMemoryWidget');
+      await requestWidgetUpdate({
+        widgetName: 'RoojifeelPinned',
+        renderWidget: () => <PinnedMemoryWidget memory={memory} />,
+        widgetNotFound: () => {},
+      });
+    } catch {
+      // ignore
+    }
+  } else if (Platform.OS === 'ios') {
+    try {
+      const { RoojifeelPinnedIosWidget } = await import('./PinnedIosWidget');
+      RoojifeelPinnedIosWidget.updateSnapshot({
+        hasPin: memory != null,
+        emoji: memory?.emoji ?? '',
+        feeling: (ar ? memory?.feelingAr : memory?.feelingEn) ?? '',
+        note: memory?.note ?? '',
+        date: (ar ? memory?.dateAr : memory?.dateEn) ?? '',
+        title: ar ? 'ذكرى مثبتة' : 'PINNED MEMORY',
+        emptyText: ar ? 'ثبّت ذكرى من دفترك' : 'Pin a memory from your journal',
+      });
+    } catch {
+      // ignore
     }
   }
 }
@@ -163,14 +200,19 @@ export function RoojifeelWidget({ summary }: { summary: WidgetSummary }) {
   );
 }
 
-/** Headless task handler — renders the widget from the cached summary. */
+/** Headless task handler — renders whichever widget the launcher asks for. */
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps): Promise<void> {
   switch (props.widgetAction) {
     case 'WIDGET_ADDED':
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED': {
-      const summary = await loadSummary();
-      props.renderWidget(<RoojifeelWidget summary={summary} />);
+      if (props.widgetInfo.widgetName === 'RoojifeelPinned') {
+        const memory = await getPinnedMemory();
+        props.renderWidget(<PinnedMemoryWidget memory={memory} />);
+      } else {
+        const summary = await loadSummary();
+        props.renderWidget(<RoojifeelWidget summary={summary} />);
+      }
       break;
     }
     default:

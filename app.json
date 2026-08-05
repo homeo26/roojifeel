@@ -83,6 +83,16 @@
               "targetCellWidth": 3,
               "targetCellHeight": 2,
               "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "RoojifeelPinned",
+              "label": "Pinned memory",
+              "description": "A cherished feeling, kept close",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "updatePeriodMillis": 1800000
             }
           ]
         }
@@ -95,6 +105,15 @@
               "name": "RoojifeelWidget",
               "displayName": "Roojifeel",
               "description": "Today's mood and a one-tap feeling log",
+              "supportedFamilies": [
+                "systemSmall",
+                "systemMedium"
+              ]
+            },
+            {
+              "name": "RoojifeelPinnedWidget",
+              "displayName": "Pinned memory",
+              "description": "A cherished feeling, kept close",
               "supportedFamilies": [
                 "systemSmall",
                 "systemMedium"
