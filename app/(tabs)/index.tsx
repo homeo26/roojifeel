@@ -7,6 +7,8 @@ import * as haptics from '../../src/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeIn,
+  FadeOut,
+  ZoomIn,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -471,20 +473,37 @@ export default function HomeScreen() {
         )}
       />
       {celebration != null ? (
-        <Pressable style={styles.celebrationBackdrop} onPress={() => setCelebration(null)}>
-          <Animated.View entering={FadeIn.duration(250)} style={styles.celebrationCard}>
-            <Text style={styles.celebrationEmoji}>🎉</Text>
+        <Animated.View
+          entering={FadeIn.duration(220)}
+          exiting={FadeOut.duration(180)}
+          style={styles.celebrationBackdrop}
+        >
+          <Pressable style={styles.celebrationTouch} onPress={() => setCelebration(null)}>
+          <Animated.View
+            entering={ZoomIn.delay(120).springify().damping(13).stiffness(160)}
+            style={styles.celebrationCard}
+          >
+            <Animated.Text
+              entering={ZoomIn.delay(320).springify().damping(8).stiffness(180)}
+              style={styles.celebrationEmoji}
+            >
+              🎉
+            </Animated.Text>
             <Text style={[styles.celebrationTitle, { fontFamily: font(lang, 'extrabold') }]}>
               {t('home.milestoneTitle', { count: celebration })}
             </Text>
             <Text style={[styles.celebrationSub, { fontFamily: font(lang, 'regular') }]}>
               {t('home.milestoneSub')}
             </Text>
-            <Text style={[styles.celebrationDismiss, { fontFamily: font(lang, 'semibold') }]}>
+            <Animated.Text
+              entering={FadeIn.delay(700).duration(300)}
+              style={[styles.celebrationDismiss, { fontFamily: font(lang, 'semibold') }]}
+            >
               {t('home.milestoneDismiss')}
-            </Text>
+            </Animated.Text>
           </Animated.View>
-        </Pressable>
+          </Pressable>
+        </Animated.View>
       ) : null}
     </SafeAreaView>
   );
@@ -501,6 +520,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: theme.spacing.xl,
+  },
+  celebrationTouch: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   celebrationCard: {
     alignItems: 'center',
