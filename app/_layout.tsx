@@ -79,6 +79,10 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
+          name="onboarding"
+          options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}
+        />
+        <Stack.Screen
           name="wrapped"
           options={{ presentation: 'modal', animation: 'slide_from_bottom', animationDuration: 250 }}
         />

@@ -19,6 +19,8 @@ import { theme, font, displayFont } from '../../src/theme';
 import { isSameDay } from '../../src/timeFormat';
 import { claimMilestone, computeStreak, nextMilestone } from '../../src/streaks';
 import { refreshWidget } from '../../src/widget/RoojifeelWidget';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ONBOARDED_KEY } from '../onboarding';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -31,6 +33,13 @@ export default function HomeScreen() {
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [celebration, setCelebration] = useState<number | null>(null);
   const scale = useSharedValue(1);
+
+  // First launch → cozy onboarding.
+  React.useEffect(() => {
+    AsyncStorage.getItem(ONBOARDED_KEY).then((v) => {
+      if (v !== 'true') router.push('/onboarding');
+    });
+  }, [router]);
 
   useFocusEffect(
     useCallback(() => {

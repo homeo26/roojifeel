@@ -86,6 +86,22 @@
             }
           ]
         }
+      ],
+      [
+        "expo-widgets",
+        {
+          "widgets": [
+            {
+              "name": "RoojifeelWidget",
+              "displayName": "Roojifeel",
+              "description": "Today's mood and a one-tap feeling log",
+              "supportedFamilies": [
+                "systemSmall",
+                "systemMedium"
+              ]
+            }
+          ]
+        }
       ]
     ],
     "owner": "homeo26s-team"

@@ -27,9 +27,8 @@ export interface WidgetSummary {
   lang: string;
 }
 
-/** Recompute + cache the widget summary and push a widget refresh. */
+/** Recompute + cache the widget summary and push a widget refresh (both platforms). */
 export async function refreshWidget(entries: FeelingEntry[], lang: string): Promise<void> {
-  if (Platform.OS !== 'android') return;
   const now = new Date();
   const todays = entries.filter((e) => {
     const d = new Date(e.createdAt);
@@ -53,15 +52,29 @@ export async function refreshWidget(entries: FeelingEntry[], lang: string): Prom
   };
   await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(summary));
 
-  try {
-    const { requestWidgetUpdate } = await import('react-native-android-widget');
-    await requestWidgetUpdate({
-      widgetName: 'Roojifeel',
-      renderWidget: () => <RoojifeelWidget summary={summary} />,
-      widgetNotFound: () => {},
-    });
-  } catch {
-    // Widget module unavailable (e.g. first run before prebuild) — ignore.
+  if (Platform.OS === 'android') {
+    try {
+      const { requestWidgetUpdate } = await import('react-native-android-widget');
+      await requestWidgetUpdate({
+        widgetName: 'Roojifeel',
+        renderWidget: () => <RoojifeelWidget summary={summary} />,
+        widgetNotFound: () => {},
+      });
+    } catch {
+      // Widget module unavailable — ignore.
+    }
+  } else if (Platform.OS === 'ios') {
+    try {
+      const { RoojifeelIosWidget } = await import('./RoojifeelIosWidget');
+      RoojifeelIosWidget.updateSnapshot({
+        todayCount: summary.todayCount,
+        emoji: summary.emoji ?? '',
+        feeling: (lang === 'ar' ? summary.feelingAr : summary.feelingEn) ?? '',
+        prompt: '',
+      });
+    } catch {
+      // Widget module unavailable — ignore.
+    }
   }
 }
 
