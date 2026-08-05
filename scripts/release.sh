@@ -31,11 +31,14 @@ echo "==> Android universal APK (all ABIs)"
   -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64)
 cp android/app/build/outputs/apk/release/app-release.apk "$OUT/Roojifeel-v${VERSION}-universal.apk"
 
+# NOTE: device builds must stay unsigned — entitlements (app groups for
+# widgets) require a real development certificate on the iOS platform.
+# Sideload re-signers (AltStore/Xcode) apply their own entitlements.
 echo "==> iOS unsigned device IPA"
 DERIVED="/tmp/roojifeel-release-derived"
 (cd ios && xcodebuild -workspace Roojifeel.xcworkspace -scheme Roojifeel \
   -configuration Release -destination 'generic/platform=iOS' \
-  -derivedDataPath "$DERIVED" build CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO >/dev/null)
+  -derivedDataPath "$DERIVED" build CODE_SIGNING_ALLOWED=NO >/dev/null)
 STAGE=$(mktemp -d)
 mkdir -p "$STAGE/Payload"
 cp -R "$DERIVED/Build/Products/Release-iphoneos/Roojifeel.app" "$STAGE/Payload/"
