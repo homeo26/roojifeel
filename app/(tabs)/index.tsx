@@ -417,8 +417,10 @@ export default function HomeScreen() {
                   </View>
                 </Pressable>
               </Animated.View>
-            ) : (
-              <Animated.View entering={fade(140)}>
+            ) : null}
+
+            {/* Daily reflection prompt */}
+            <Animated.View entering={fade(160)}>
                 <Pressable
                   style={({ pressed }) => [styles.promptCard, pressed && styles.pressedCard]}
                   onPress={() => {
@@ -437,7 +439,6 @@ export default function HomeScreen() {
                   </View>
                 </Pressable>
               </Animated.View>
-            )}
 
             {recent.length > 0 ? (
               <View style={styles.sectionRow}>
