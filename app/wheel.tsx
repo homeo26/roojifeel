@@ -6,7 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -170,6 +170,7 @@ export default function WheelScreen() {
   const lang = i18n.language;
   const router = useRouter();
   const [selected, setSelected] = useState<Segment | null>(null);
+  const { zoom } = useLocalSearchParams<{ zoom?: string }>();
   const [zoomed, setZoomed] = useState(false);
 
   const { segments, coreCenters } = useMemo(buildSegments, []);
@@ -180,6 +181,18 @@ export default function WheelScreen() {
   const startTouchAngle = useSharedValue(0);
   const scale = useSharedValue(1);
   const startScale = useSharedValue(1);
+
+  // Dev/deep-link zoom control (also lets links open the wheel pre-zoomed).
+  React.useEffect(() => {
+    const z = zoom ? Number(zoom) : NaN;
+    if (!Number.isNaN(z)) {
+      scale.value = withTiming(Math.min(Math.max(z, 1), 3.2), {
+        duration: 400,
+        easing: theme.motion.easing,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom]);
 
   useDerivedValue(() => {
     runOnJS(setZoomed)(scale.value > 1.08);
