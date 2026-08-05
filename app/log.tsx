@@ -81,13 +81,26 @@ export default function LogScreen() {
   const [isPinned, setIsPinned] = useState(false);
 
   // Voice memo recording/playback.
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(recorder);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const recorderState = useAudioRecorderState(recorder, 100);
+  const [waveSamples, setWaveSamples] = useState<number[]>([]);
   const player = useAudioPlayer(audioUri ?? undefined);
 
   useEffect(() => {
     getAllTags().then(setTagSuggestions);
   }, []);
+
+  // Live waveform: map metering (dBFS, ~-60..0) to 0..1 and keep the last 28.
+  useEffect(() => {
+    if (!recorderState.isRecording) return;
+    const db = recorderState.metering ?? -60;
+    const level = Math.min(Math.max((db + 50) / 50, 0.06), 1);
+    setWaveSamples((prev) => [...prev.slice(-27), level]);
+  }, [recorderState.metering, recorderState.isRecording]);
+
+  useEffect(() => {
+    if (!recorderState.isRecording) setWaveSamples([]);
+  }, [recorderState.isRecording]);
 
   // Track whether this entry is the pinned memory.
   useEffect(() => {
@@ -613,28 +626,41 @@ export default function LogScreen() {
                     <Ionicons name="close-circle" size={18} color={theme.colors.inkFaint} />
                   </Pressable>
                 </View>
-              ) : (
+              ) : recorderState.isRecording ? (
                 <Pressable
-                  style={({ pressed }) => [
-                    styles.attachBtn,
-                    recorderState.isRecording && styles.recording,
-                    pressed && styles.pressed,
-                  ]}
+                  style={({ pressed }) => [styles.waveBar, pressed && styles.pressed]}
                   onPress={toggleRecording}
                 >
-                  <Ionicons
-                    name={recorderState.isRecording ? 'stop-circle' : 'mic-outline'}
-                    size={20}
-                    color={recorderState.isRecording ? theme.colors.danger : theme.colors.pinkSoft}
-                  />
-                  <Text
-                    style={[
-                      styles.attachText,
-                      { fontFamily: font(lang, 'semibold') },
-                      recorderState.isRecording && { color: theme.colors.danger },
-                    ]}
-                  >
-                    {recorderState.isRecording ? t('log.stopRecording') : t('log.recordVoice')}
+                  <Animated.View entering={FadeIn.duration(200)} style={styles.waveDot} />
+                  <View style={styles.waveTrack}>
+                    {Array.from({ length: 28 }).map((_, i) => {
+                      const sample = waveSamples[waveSamples.length - 28 + i];
+                      const h = sample != null ? 4 + sample * 22 : 3;
+                      return (
+                        <View
+                          key={i}
+                          style={[
+                            styles.waveTick,
+                            { height: h, opacity: sample != null ? 0.4 + sample * 0.6 : 0.25 },
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+                  <Text style={[styles.waveTime, { fontFamily: font(lang, 'bold') }]}>
+                    {Math.floor((recorderState.durationMillis ?? 0) / 60000)}:
+                    {String(Math.floor(((recorderState.durationMillis ?? 0) % 60000) / 1000)).padStart(2, '0')}
+                  </Text>
+                  <Ionicons name="stop-circle" size={24} color={theme.colors.danger} />
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [styles.attachBtn, pressed && styles.pressed]}
+                  onPress={toggleRecording}
+                >
+                  <Ionicons name="mic-outline" size={20} color={theme.colors.pinkSoft} />
+                  <Text style={[styles.attachText, { fontFamily: font(lang, 'semibold') }]}>
+                    {t('log.recordVoice')}
                   </Text>
                 </Pressable>
               )}
@@ -944,6 +970,42 @@ const styles = StyleSheet.create({
   recording: {
     borderColor: theme.colors.danger,
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  waveBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  waveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.danger,
+  },
+  waveTrack: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 28,
+  },
+  waveTick: {
+    flex: 1,
+    minWidth: 2,
+    borderRadius: 2,
+    backgroundColor: theme.colors.pinkSoft,
+  },
+  waveTime: {
+    fontSize: 12,
+    color: theme.colors.danger,
+    fontVariant: ['tabular-nums'],
   },
   audioReady: {
     borderColor: theme.colors.teal,

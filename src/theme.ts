@@ -1,5 +1,5 @@
 /**
- * Roojifeel theme — Cybertron design language, now in dark and light.
+ * Roojifeel theme — the Roojifeel design language, now in dark and light.
  *
  * The palette is resolved ONCE at JS boot (see index.js → bootTheme) by
  * mutating this shared object before any screen module creates its

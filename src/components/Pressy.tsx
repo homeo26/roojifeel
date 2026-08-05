@@ -1,6 +1,6 @@
 /**
  * Pressy — a Pressable with consistent press feedback: a fast, subtle
- * scale + fade (150ms, Cybertron easing). Use it anywhere a control
+ * scale + fade (150ms, the app easing curve). Use it anywhere a control
  * needs to feel alive without hand-rolling animations.
  */
 import React from 'react';

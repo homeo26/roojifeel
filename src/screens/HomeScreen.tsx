@@ -22,6 +22,7 @@ import { theme, font, displayFont } from '../theme';
 import { isSameDay } from '../timeFormat';
 import { useTabPager } from './TabPagerContext';
 import { CoreLegend } from '../components/CoreLegend';
+import { AmbientGlow } from '../components/AmbientGlow';
 import { claimMilestone, computeStreak, nextMilestone } from '../streaks';
 import { refreshWidget } from '../widget/RoojifeelWidget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -160,6 +161,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { direction: lang === 'ar' ? 'rtl' : 'ltr' }]} edges={['top']}>
+      <AmbientGlow />
       <FlatList
         data={recent}
         keyExtractor={(e) => String(e.id)}
