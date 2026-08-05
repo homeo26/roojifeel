@@ -16,7 +16,11 @@ export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const lastNavRef = React.useRef(0);
+
   const swipeTo = (dir: 1 | -1) => {
+    if (Date.now() - lastNavRef.current < 320) return; // let the transition finish
+    lastNavRef.current = Date.now();
     // Visual order is reversed in RTL, so flip the direction there.
     const step = lang === 'ar' ? (dir === 1 ? -1 : 1) : dir;
     const idx = TAB_PATHS.indexOf(pathname);
@@ -41,10 +45,13 @@ export default function TabsLayout() {
     <GestureDetector gesture={swipe}>
       <View style={{ flex: 1 }}>
         <Tabs
+          detachInactiveScreens={false}
           tabBar={(props) => <TabBar {...props} />}
           screenOptions={{
             headerShown: false,
             animation: 'shift',
+            freezeOnBlur: false,
+            lazy: false,
             transitionSpec: {
               animation: 'timing',
               config: { duration: theme.motion.base },

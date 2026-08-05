@@ -40,6 +40,7 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export function TabBar({ state, descriptors, navigation }: TabBarProps) {
+  const lastNavRef = React.useRef(0);
   const insets = useSafeAreaInsets();
   const { i18n } = useTranslation();
   const lang = i18n.language;
@@ -62,6 +63,9 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
             style={styles.item}
             scaleTo={0.9}
             onPress={() => {
+              // Ignore presses while a transition is in flight — interrupted
+              // shift transitions can freeze a blank scene on top.
+              if (Date.now() - lastNavRef.current < 320) return;
               haptics.selection();
               const event = navigation.emit({
                 type: 'tabPress',
@@ -69,6 +73,7 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
                 canPreventDefault: true,
               });
               if (!focused && !event.defaultPrevented) {
+                lastNavRef.current = Date.now();
                 navigation.navigate(route.name);
               }
             }}
