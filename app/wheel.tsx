@@ -183,8 +183,7 @@ export default function WheelScreen() {
 
   // Spin + zoom physics
   const rotation = useSharedValue(0);
-  const startRotation = useSharedValue(0);
-  const startTouchAngle = useSharedValue(0);
+  const lastTouchAngle = useSharedValue(0);
   const scale = useSharedValue(1);
   const startScale = useSharedValue(1);
 
@@ -208,12 +207,17 @@ export default function WheelScreen() {
     .minDistance(10)
     .maxPointers(1)
     .onStart((e) => {
-      startRotation.value = rotation.value;
-      startTouchAngle.value = (Math.atan2(e.y - CY, e.x - CX) * 180) / Math.PI;
+      lastTouchAngle.value = (Math.atan2(e.y - CY, e.x - CX) * 180) / Math.PI;
     })
     .onUpdate((e) => {
       const a = (Math.atan2(e.y - CY, e.x - CX) * 180) / Math.PI;
-      rotation.value = startRotation.value + (a - startTouchAngle.value);
+      // Incremental delta, normalized into (-180, 180] so crossing the
+      // atan2 seam never snaps the wheel a full turn.
+      let delta = a - lastTouchAngle.value;
+      if (delta > 180) delta -= 360;
+      else if (delta < -180) delta += 360;
+      rotation.value += delta;
+      lastTouchAngle.value = a;
     })
     .onEnd((e) => {
       const dx = e.x - CX;
@@ -293,10 +297,16 @@ export default function WheelScreen() {
       <Text style={[styles.hint, { fontFamily: font(lang, 'regular') }]}>{t('wheel.hint')}</Text>
 
       {/* The wheel */}
-      <View style={styles.wheelWrap}>
+      <Pressable style={styles.wheelWrap} onPress={() => setSelected(null)}>
         <GestureDetector gesture={gestures}>
           <Animated.View style={[{ width: WHEEL_SIZE, height: WHEEL_SIZE }, wheelStyle]}>
             <Svg width={WHEEL_SIZE} height={WHEEL_SIZE}>
+              {/* Backdrop: tapping outside the rings clears the selection */}
+              <Path
+                d={`M 0 0 H ${WHEEL_SIZE} V ${WHEEL_SIZE} H 0 Z`}
+                fill="transparent"
+                onPress={() => setSelected(null)}
+              />
               <G>
                 {segments.map((seg) => (
                   <Path
@@ -371,7 +381,7 @@ export default function WheelScreen() {
             </View>
           </Animated.View>
         </GestureDetector>
-      </View>
+      </Pressable>
 
       {/* Selection card — re-keyed so every selection animates in */}
       {selected && core ? (
