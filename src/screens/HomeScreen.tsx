@@ -4,7 +4,7 @@ import { ScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as haptics from '../../src/haptics';
+import * as haptics from '../haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeIn,
@@ -14,25 +14,27 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { FeelingEntry, deleteEntry, getAllEntries } from '../../src/db';
-import { FEELINGS_WHEEL, getCore } from '../../src/data/feelings';
+import { FeelingEntry, deleteEntry, getAllEntries } from '../db';
+import { FEELINGS_WHEEL, getCore } from '../data/feelings';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { EntryCard } from '../../src/components/EntryCard';
-import { theme, font, displayFont } from '../../src/theme';
-import { isSameDay } from '../../src/timeFormat';
-import { claimMilestone, computeStreak, nextMilestone } from '../../src/streaks';
-import { refreshWidget } from '../../src/widget/RoojifeelWidget';
+import { EntryCard } from '../components/EntryCard';
+import { theme, font, displayFont } from '../theme';
+import { isSameDay } from '../timeFormat';
+import { useTabPager } from './TabPagerContext';
+import { claimMilestone, computeStreak, nextMilestone } from '../streaks';
+import { refreshWidget } from '../widget/RoojifeelWidget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ONBOARDED_KEY } from '../onboarding';
+import { ONBOARDED_KEY } from '../../app/onboarding';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const fade = (delay = 0) => FadeIn.duration(theme.motion.base).delay(delay);
 
-export default function HomeScreen() {
+export function HomeScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const router = useRouter();
+  const { goToTab } = useTabPager();
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [celebration, setCelebration] = useState<number | null>(null);
   const scale = useSharedValue(1);
@@ -314,7 +316,7 @@ export default function HomeScreen() {
                   style={({ pressed }) => [styles.statBox, pressed && styles.pressedCard]}
                   onPress={() => {
                     haptics.selection();
-                    router.navigate('/stats');
+                    goToTab('stats');
                   }}
                 >
                   <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
@@ -347,7 +349,7 @@ export default function HomeScreen() {
                   ]}
                   onPress={() => {
                     haptics.selection();
-                    router.navigate('/stats');
+                    goToTab('stats');
                   }}
                 >
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: weekTopCore.tint, borderRadius: theme.radius.md }]} />
@@ -378,7 +380,7 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.activityCard, pressed && styles.pressedCard]}
                 onPress={() => {
                   haptics.selection();
-                  router.navigate('/stats');
+                  goToTab('stats');
                 }}
               >
                 <Text style={[styles.cardLabel, { fontFamily: font(lang, 'semibold') }]}>
@@ -478,7 +480,7 @@ export default function HomeScreen() {
                   hitSlop={8}
                   onPress={() => {
                     haptics.selection();
-                    router.navigate('/history');
+                    goToTab('history');
                   }}
                 >
                   <Text style={[styles.viewAll, { fontFamily: font(lang, 'bold') }]}>

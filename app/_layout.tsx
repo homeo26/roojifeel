@@ -77,7 +77,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: theme.colors.background },
         }}
       >
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="index" />
         <Stack.Screen
           name="onboarding"
           options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }}

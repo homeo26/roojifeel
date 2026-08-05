@@ -10,9 +10,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as haptics from '../../src/haptics';
+import * as haptics from '../haptics';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
-import { FeelingEntry, getEntriesBetween } from '../../src/db';
+import { FeelingEntry, getEntriesBetween } from '../db';
 import {
   CoreFeeling,
   FEELINGS_WHEEL,
@@ -20,18 +20,18 @@ import {
   getSecondary,
   getTertiary,
   label,
-} from '../../src/data/feelings';
-import { ActivityBars, Donut, Gauge } from '../../src/components/Charts';
-import { MoodCalendar } from '../../src/components/MoodCalendar';
-import { TrendChart, TrendPoint } from '../../src/components/TrendChart';
+} from '../data/feelings';
+import { ActivityBars, Donut, Gauge } from '../components/Charts';
+import { MoodCalendar } from '../components/MoodCalendar';
+import { TrendChart, TrendPoint } from '../components/TrendChart';
 import {
   DEFAULT_RANGE,
   TimeRange,
   TimeRangePicker,
   rangeDayCount,
   resolveRange,
-} from '../../src/components/TimeRangePicker';
-import { theme, font } from '../../src/theme';
+} from '../components/TimeRangePicker';
+import { theme, font } from '../theme';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const fade = (delay = 0) => FadeIn.duration(theme.motion.base).delay(delay);
@@ -81,7 +81,7 @@ function HBar({
   );
 }
 
-export default function StatsScreen() {
+export function StatsScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const router = useRouter();

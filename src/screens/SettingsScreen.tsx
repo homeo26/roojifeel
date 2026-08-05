@@ -16,25 +16,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
-import * as haptics from '../../src/haptics';
+import * as haptics from '../haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { theme, font } from '../../src/theme';
-import { Pressy } from '../../src/components/Pressy';
-import { saveLanguage } from '../../src/i18n';
+import { theme, font } from '../theme';
+import { Pressy } from '../components/Pressy';
+import { saveLanguage } from '../i18n';
 import {
   ReminderTime,
   applyReminders,
   loadReminders,
   normalizeReminders,
   requestNotificationPermission,
-} from '../../src/notifications';
-import { exportHistory, importHistory } from '../../src/exportImport';
-import { disableBackup, enableBackup, getBackupStatus } from '../../src/backup';
+} from '../notifications';
+import { exportHistory, importHistory } from '../exportImport';
+import { disableBackup, enableBackup, getBackupStatus } from '../backup';
 
 const layoutT = () => LinearTransition.duration(theme.motion.fast);
 
-export default function SettingsScreen() {
+export function SettingsScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
 

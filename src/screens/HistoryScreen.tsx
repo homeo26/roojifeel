@@ -1,21 +1,21 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { getCore, getSecondary, getTertiary } from '../../src/data/feelings';
+import { getCore, getSecondary, getTertiary } from '../data/feelings';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { FeelingEntry, deleteEntry, getAllEntries } from '../../src/db';
-import { EntryCard } from '../../src/components/EntryCard';
-import { theme, font } from '../../src/theme';
-import { formatDayLabel } from '../../src/timeFormat';
+import { FeelingEntry, deleteEntry, getAllEntries } from '../db';
+import { EntryCard } from '../components/EntryCard';
+import { theme, font } from '../theme';
+import { formatDayLabel } from '../timeFormat';
 
 interface DaySection {
   title: string;
   data: FeelingEntry[];
 }
 
-export default function HistoryScreen() {
+export function HistoryScreen() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
