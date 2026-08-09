@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Image, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -23,6 +23,7 @@ import { isSameDay } from '../timeFormat';
 import { useTabPager } from './TabPagerContext';
 import { CoreLegend } from '../components/CoreLegend';
 import { AmbientGlow } from '../components/AmbientGlow';
+import { Pressy } from '../components/Pressy';
 import { claimMilestone, computeStreak, nextMilestone } from '../streaks';
 import { refreshWidget } from '../widget/RoojifeelWidget';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,7 +40,7 @@ export function HomeScreen() {
   const { goToTab } = useTabPager();
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [celebration, setCelebration] = useState<number | null>(null);
-  const [tile, setTile] = useState<'today' | 'streak' | 'total'>('today');
+  const [detail, setDetail] = useState<'today' | 'streak' | 'total' | null>(null);
   const scale = useSharedValue(1);
 
   // First launch → cozy onboarding.
@@ -384,162 +385,36 @@ export function HomeScreen() {
                   value: String(entries.length),
                   sub: t('home.statTotalUnit'),
                 },
-              ]).map((item) => {
-                const active = tile === item.id;
-                return (
-                  <Pressable
-                    key={item.id}
-                    style={({ pressed }) => [
-                      styles.statBox,
-                      active && styles.statBoxActive,
-                      pressed && styles.pressedCard,
-                    ]}
-                    onPress={() => {
-                      haptics.selection();
-                      setTile(item.id);
-                    }}
-                  >
-                    <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
-                      {item.label}
-                    </Text>
-                    <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
-                      {item.value}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.statSub,
-                        { fontFamily: font(lang, 'semibold') },
-                        item.subColor ? { color: item.subColor } : null,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {item.sub}
-                    </Text>
-                    {active ? <View style={styles.statActiveBar} /> : null}
-                  </Pressable>
-                );
-              })}
-            </Animated.View>
-
-            {/* Inline detail panel for the selected tile */}
-            <Animated.View
-              key={tile}
-              entering={FadeIn.duration(theme.motion.base)}
-              style={styles.statDetail}
-            >
-              {tile === 'today' ? (
-                homeStats.todayBreakdown.length > 0 ? (
-                  <View>
-                    <Text style={[styles.detailLabel, { fontFamily: font(lang, 'semibold') }]}>
-                      {t('home.detailTodayTitle')}
-                    </Text>
-                    {homeStats.todayBreakdown.map(({ core, n }) => (
-                      <View key={core!.id} style={styles.detailRow}>
-                        <View style={[styles.detailDot, { backgroundColor: core!.color }]} />
-                        <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
-                          {core!.emoji} {lang === 'ar' ? core!.ar : core!.en}
-                        </Text>
-                        <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold'), color: core!.colorMid }]}>
-                          {t('stats.timesFelt', { count: n })}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={[styles.detailEmpty, { fontFamily: font(lang, 'regular') }]}>
-                    {t('home.detailTodayEmpty')}
+              ]).map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={({ pressed }) => [styles.statBox, pressed && styles.pressedCard]}
+                  onPress={() => {
+                    haptics.selection();
+                    setDetail(item.id);
+                  }}
+                >
+                  <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
+                    {item.label}
                   </Text>
-                )
-              ) : null}
-
-              {tile === 'streak' ? (
-                <View>
-                  {nextMilestone(streak) != null ? (
-                    <>
-                      <View style={styles.detailRow}>
-                        <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
-                          {t('home.detailNextMilestone', { next: nextMilestone(streak) })}
-                        </Text>
-                        <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold'), color: theme.colors.purpleSoft }]}>
-                          {streak}/{nextMilestone(streak)}
-                        </Text>
-                      </View>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${Math.min(100, (streak / (nextMilestone(streak) as number)) * 100)}%` },
-                          ]}
-                        />
-                      </View>
-                    </>
-                  ) : (
-                    <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
-                      {t('home.detailAllMilestones')}
-                    </Text>
-                  )}
-                  <View style={[styles.detailRow, { marginTop: 8 }]}>
-                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
-                      {t('home.detailBestStreak')}
-                    </Text>
-                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
-                      {t('home.detailDays', { count: homeStats.bestStreak })}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-
-              {tile === 'total' ? (
-                <View>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
-                      {t('home.detailDaysLogged')}
-                    </Text>
-                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
-                      {t('home.detailDays', { count: homeStats.daysLogged })}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
-                      {t('home.detailAvgPerDay')}
-                    </Text>
-                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
-                      {homeStats.avgPerDay.toFixed(1)}
-                    </Text>
-                  </View>
-                  {homeStats.firstDate ? (
-                    <View style={styles.detailRow}>
-                      <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
-                        {t('home.detailSince')}
-                      </Text>
-                      <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
-                        {homeStats.firstDate.toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <Pressable
-                    style={styles.detailMoreBtn}
-                    onPress={() => {
-                      haptics.selection();
-                      goToTab('stats');
-                    }}
+                  <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
+                    {item.value}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.statSub,
+                      { fontFamily: font(lang, 'semibold') },
+                      item.subColor ? { color: item.subColor } : null,
+                    ]}
+                    numberOfLines={1}
                   >
-                    <Text style={[styles.detailMoreText, { fontFamily: font(lang, 'bold') }]}>
-                      {t('home.detailSeeAll')}
-                    </Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={13}
-                      color={theme.colors.purpleSoft}
-                      style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
-                    />
-                  </Pressable>
-                </View>
-              ) : null}
+                    {item.sub}
+                  </Text>
+                  <View style={styles.statChevron}>
+                    <Ionicons name="ellipsis-horizontal" size={12} color={theme.colors.inkFaint} />
+                  </View>
+                </Pressable>
+              ))}
             </Animated.View>
 
             {/* Weekly insight → stats */}
@@ -721,6 +596,147 @@ export function HomeScreen() {
           </Pressable>
         </Animated.View>
       ) : null}
+
+      {/* Stat detail popup */}
+      <Modal
+        visible={detail != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDetail(null)}
+      >
+        <Pressable style={styles.popupBackdrop} onPress={() => setDetail(null)}>
+          <Animated.View
+            key={detail}
+            entering={ZoomIn.duration(200).springify().damping(18)}
+            style={styles.popupCard}
+          >
+            <Pressable onPress={() => {}}>
+              <View style={styles.popupHeader}>
+                <Text style={[styles.popupTitle, { fontFamily: displayFont(lang) }]}>
+                  {detail === 'today'
+                    ? t('home.statToday')
+                    : detail === 'streak'
+                      ? t('home.statStreak')
+                      : t('home.statTotal')}
+                </Text>
+                <Pressy hitSlop={10} scaleTo={0.85} onPress={() => setDetail(null)}>
+                  <Ionicons name="close" size={22} color={theme.colors.inkSoft} />
+                </Pressy>
+              </View>
+
+              {detail === 'today' ? (
+                homeStats.todayBreakdown.length > 0 ? (
+                  homeStats.todayBreakdown.map(({ core, n }) => (
+                    <View key={core!.id} style={styles.detailRow}>
+                      <View style={[styles.detailDot, { backgroundColor: core!.color }]} />
+                      <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
+                        {core!.emoji} {lang === 'ar' ? core!.ar : core!.en}
+                      </Text>
+                      <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold'), color: core!.colorMid }]}>
+                        {t('stats.timesFelt', { count: n })}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={[styles.detailEmpty, { fontFamily: font(lang, 'regular') }]}>
+                    {t('home.detailTodayEmpty')}
+                  </Text>
+                )
+              ) : null}
+
+              {detail === 'streak' ? (
+                <View>
+                  {nextMilestone(streak) != null ? (
+                    <>
+                      <View style={styles.detailRow}>
+                        <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
+                          {t('home.detailNextMilestone', { next: nextMilestone(streak) })}
+                        </Text>
+                        <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold'), color: theme.colors.purpleSoft }]}>
+                          {streak}/{nextMilestone(streak)}
+                        </Text>
+                      </View>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${Math.min(100, (streak / (nextMilestone(streak) as number)) * 100)}%` },
+                          ]}
+                        />
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('home.detailAllMilestones')}
+                    </Text>
+                  )}
+                  <View style={[styles.detailRow, { marginTop: 8 }]}>
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                      {t('home.detailBestStreak')}
+                    </Text>
+                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                      {t('home.detailDays', { count: homeStats.bestStreak })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {detail === 'total' ? (
+                <View>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                      {t('home.detailDaysLogged')}
+                    </Text>
+                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                      {t('home.detailDays', { count: homeStats.daysLogged })}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                      {t('home.detailAvgPerDay')}
+                    </Text>
+                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                      {homeStats.avgPerDay.toFixed(1)}
+                    </Text>
+                  </View>
+                  {homeStats.firstDate ? (
+                    <View style={styles.detailRow}>
+                      <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                        {t('home.detailSince')}
+                      </Text>
+                      <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                        {homeStats.firstDate.toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Pressable
+                    style={styles.detailMoreBtn}
+                    onPress={() => {
+                      haptics.selection();
+                      setDetail(null);
+                      goToTab('stats');
+                    }}
+                  >
+                    <Text style={[styles.detailMoreText, { fontFamily: font(lang, 'bold') }]}>
+                      {t('home.detailSeeAll')}
+                    </Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={13}
+                      color={theme.colors.purpleSoft}
+                      style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
+            </Pressable>
+          </Animated.View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1068,33 +1084,39 @@ const styles = StyleSheet.create({
     gap: 2,
     overflow: 'hidden',
   },
-  statBoxActive: {
-    borderColor: theme.colors.purple,
-    backgroundColor: 'rgba(124, 58, 237, 0.10)',
-  },
-  statActiveBar: {
+  statChevron: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 3,
-    backgroundColor: theme.colors.purple,
+    top: 8,
+    right: 8,
+    opacity: 0.6,
   },
-  statDetail: {
-    marginTop: 10,
-    backgroundColor: theme.colors.surface,
+  popupBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+  },
+  popupCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: theme.colors.surfaceSolid,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
+    borderColor: theme.colors.borderBright,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    ...theme.shadow.card,
   },
-  detailLabel: {
-    fontSize: 10,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: theme.colors.inkFaint,
-    marginBottom: 8,
-    textAlign: 'left',
+  popupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.sm,
+  },
+  popupTitle: {
+    fontSize: 20,
+    letterSpacing: -0.4,
+    color: theme.colors.ink,
   },
   detailRow: {
     flexDirection: 'row',
