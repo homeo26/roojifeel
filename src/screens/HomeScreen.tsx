@@ -39,6 +39,7 @@ export function HomeScreen() {
   const { goToTab } = useTabPager();
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [celebration, setCelebration] = useState<number | null>(null);
+  const [tile, setTile] = useState<'today' | 'streak' | 'total'>('today');
   const scale = useSharedValue(1);
 
   // First launch → cozy onboarding.
@@ -141,6 +142,50 @@ export function HomeScreen() {
     const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
     return getCore(top[0]) ?? null;
   }, [entries]);
+
+  // Extra stats for the interactive tile dashboard.
+  const homeStats = useMemo(() => {
+    // Day set + best consecutive-day streak ever.
+    const dayKeys = new Set(
+      entries.map((e) => {
+        const d = new Date(e.createdAt);
+        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      }),
+    );
+    const sortedDays = Array.from(dayKeys)
+      .map((k) => {
+        const [y, m, d] = k.split('-').map(Number);
+        return new Date(y, m, d).getTime();
+      })
+      .sort((a, b) => a - b);
+    let best = 0;
+    let run = 0;
+    let prev = 0;
+    for (const ms of sortedDays) {
+      run = prev && ms - prev === DAY_MS ? run + 1 : 1;
+      best = Math.max(best, run);
+      prev = ms;
+    }
+    const firstMs = sortedDays[0];
+    const spanDays = firstMs ? Math.max(1, Math.round((Date.now() - firstMs) / DAY_MS)) : 1;
+
+    // Today's core breakdown (sorted).
+    const todays = entries.filter((e) => isSameDay(new Date(e.createdAt), today));
+    const todayCounts = new Map<string, number>();
+    for (const e of todays) for (const f of e.feelings) todayCounts.set(f.coreId, (todayCounts.get(f.coreId) ?? 0) + 1);
+    const todayBreakdown = Array.from(todayCounts.entries())
+      .map(([id, n]) => ({ core: getCore(id), n }))
+      .filter((x) => x.core)
+      .sort((a, b) => b.n - a.n);
+
+    return {
+      bestStreak: best,
+      daysLogged: dayKeys.size,
+      avgPerDay: entries.length / spanDays,
+      firstDate: firstMs ? new Date(firstMs) : null,
+      todayBreakdown,
+    };
+  }, [entries, today]);
 
   const buttonStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -317,8 +362,9 @@ export function HomeScreen() {
 
             {/* Stat tiles → stats tab */}
             <Animated.View entering={fade(60)} style={styles.statRow}>
-              {[
+              {([
                 {
+                  id: 'today' as const,
                   label: t('home.statToday'),
                   value: String(todayCount),
                   sub: dominantCore
@@ -327,40 +373,173 @@ export function HomeScreen() {
                   subColor: dominantCore?.colorMid,
                 },
                 {
+                  id: 'streak' as const,
                   label: t('home.statStreak'),
                   value: String(streak),
-                  sub: nextMilestone(streak) != null
-                    ? t('home.nextMilestone', { next: nextMilestone(streak) })
-                    : t('home.statStreakUnit'),
+                  sub: t('home.statStreakUnit'),
                 },
-                { label: t('home.statTotal'), value: String(entries.length), sub: t('home.statTotalUnit') },
-              ].map((tile) => (
-                <Pressable
-                  key={tile.label}
-                  style={({ pressed }) => [styles.statBox, pressed && styles.pressedCard]}
-                  onPress={() => {
-                    haptics.selection();
-                    goToTab('stats');
-                  }}
-                >
-                  <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
-                    {tile.label}
-                  </Text>
-                  <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
-                    {tile.value}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.statSub,
-                      { fontFamily: font(lang, 'semibold') },
-                      tile.subColor ? { color: tile.subColor } : null,
+                {
+                  id: 'total' as const,
+                  label: t('home.statTotal'),
+                  value: String(entries.length),
+                  sub: t('home.statTotalUnit'),
+                },
+              ]).map((item) => {
+                const active = tile === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    style={({ pressed }) => [
+                      styles.statBox,
+                      active && styles.statBoxActive,
+                      pressed && styles.pressedCard,
                     ]}
-                    numberOfLines={1}
+                    onPress={() => {
+                      haptics.selection();
+                      setTile(item.id);
+                    }}
                   >
-                    {tile.sub}
+                    <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
+                      {item.label}
+                    </Text>
+                    <Text style={[styles.statValue, { fontFamily: font(lang, 'extrabold') }]}>
+                      {item.value}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.statSub,
+                        { fontFamily: font(lang, 'semibold') },
+                        item.subColor ? { color: item.subColor } : null,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.sub}
+                    </Text>
+                    {active ? <View style={styles.statActiveBar} /> : null}
+                  </Pressable>
+                );
+              })}
+            </Animated.View>
+
+            {/* Inline detail panel for the selected tile */}
+            <Animated.View
+              key={tile}
+              entering={FadeIn.duration(theme.motion.base)}
+              style={styles.statDetail}
+            >
+              {tile === 'today' ? (
+                homeStats.todayBreakdown.length > 0 ? (
+                  <View>
+                    <Text style={[styles.detailLabel, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('home.detailTodayTitle')}
+                    </Text>
+                    {homeStats.todayBreakdown.map(({ core, n }) => (
+                      <View key={core!.id} style={styles.detailRow}>
+                        <View style={[styles.detailDot, { backgroundColor: core!.color }]} />
+                        <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
+                          {core!.emoji} {lang === 'ar' ? core!.ar : core!.en}
+                        </Text>
+                        <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold'), color: core!.colorMid }]}>
+                          {t('stats.timesFelt', { count: n })}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={[styles.detailEmpty, { fontFamily: font(lang, 'regular') }]}>
+                    {t('home.detailTodayEmpty')}
                   </Text>
-                </Pressable>
-              ))}
+                )
+              ) : null}
+
+              {tile === 'streak' ? (
+                <View>
+                  {nextMilestone(streak) != null ? (
+                    <>
+                      <View style={styles.detailRow}>
+                        <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
+                          {t('home.detailNextMilestone', { next: nextMilestone(streak) })}
+                        </Text>
+                        <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold'), color: theme.colors.purpleSoft }]}>
+                          {streak}/{nextMilestone(streak)}
+                        </Text>
+                      </View>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${Math.min(100, (streak / (nextMilestone(streak) as number)) * 100)}%` },
+                          ]}
+                        />
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'semibold') }]}>
+                      {t('home.detailAllMilestones')}
+                    </Text>
+                  )}
+                  <View style={[styles.detailRow, { marginTop: 8 }]}>
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                      {t('home.detailBestStreak')}
+                    </Text>
+                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                      {t('home.detailDays', { count: homeStats.bestStreak })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {tile === 'total' ? (
+                <View>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                      {t('home.detailDaysLogged')}
+                    </Text>
+                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                      {t('home.detailDays', { count: homeStats.daysLogged })}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                      {t('home.detailAvgPerDay')}
+                    </Text>
+                    <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                      {homeStats.avgPerDay.toFixed(1)}
+                    </Text>
+                  </View>
+                  {homeStats.firstDate ? (
+                    <View style={styles.detailRow}>
+                      <Text style={[styles.detailName, { fontFamily: font(lang, 'regular') }]}>
+                        {t('home.detailSince')}
+                      </Text>
+                      <Text style={[styles.detailValue, { fontFamily: font(lang, 'bold') }]}>
+                        {homeStats.firstDate.toLocaleDateString(lang === 'ar' ? 'ar' : 'en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Pressable
+                    style={styles.detailMoreBtn}
+                    onPress={() => {
+                      haptics.selection();
+                      goToTab('stats');
+                    }}
+                  >
+                    <Text style={[styles.detailMoreText, { fontFamily: font(lang, 'bold') }]}>
+                      {t('home.detailSeeAll')}
+                    </Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={13}
+                      color={theme.colors.purpleSoft}
+                      style={{ transform: [{ scaleX: lang === 'ar' ? -1 : 1 }] }}
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
             </Animated.View>
 
             {/* Weekly insight → stats */}
@@ -887,6 +1066,87 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
     gap: 2,
+    overflow: 'hidden',
+  },
+  statBoxActive: {
+    borderColor: theme.colors.purple,
+    backgroundColor: 'rgba(124, 58, 237, 0.10)',
+  },
+  statActiveBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: theme.colors.purple,
+  },
+  statDetail: {
+    marginTop: 10,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+  },
+  detailLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: theme.colors.inkFaint,
+    marginBottom: 8,
+    textAlign: 'left',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+  },
+  detailDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 3,
+  },
+  detailName: {
+    flex: 1,
+    fontSize: 13,
+    color: theme.colors.ink,
+    textAlign: 'left',
+  },
+  detailValue: {
+    fontSize: 12,
+    color: theme.colors.inkSoft,
+    fontVariant: ['tabular-nums'],
+  },
+  detailEmpty: {
+    fontSize: 13,
+    color: theme.colors.inkFaint,
+    textAlign: 'center',
+    paddingVertical: 6,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.o(0.06),
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: theme.colors.purple,
+  },
+  detailMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  detailMoreText: {
+    fontSize: 12,
+    color: theme.colors.purpleSoft,
   },
   statLabel: {
     fontSize: 10,
