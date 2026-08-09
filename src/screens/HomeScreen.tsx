@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import * as haptics from '../haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   ZoomIn,
@@ -41,6 +42,7 @@ export function HomeScreen() {
   const [entries, setEntries] = useState<FeelingEntry[]>([]);
   const [celebration, setCelebration] = useState<number | null>(null);
   const [detail, setDetail] = useState<'today' | 'streak' | 'total' | null>(null);
+  const [popupVisible, setPopupVisible] = useState(false);
   const scale = useSharedValue(1);
 
   // First launch → cozy onboarding.
@@ -189,6 +191,31 @@ export function HomeScreen() {
   }, [entries, today]);
 
   const buttonStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  // Smooth popup animation (fade + gentle rise + subtle scale, ease-out).
+  const popupProgress = useSharedValue(0);
+  React.useEffect(() => {
+    if (popupVisible) {
+      popupProgress.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+    }
+  }, [popupVisible, popupProgress]);
+  const openDetail = (id: 'today' | 'streak' | 'total') => {
+    haptics.selection();
+    setDetail(id);
+    setPopupVisible(true);
+  };
+  const closeDetail = () => {
+    popupProgress.value = withTiming(0, { duration: 160, easing: Easing.in(Easing.cubic) });
+    setTimeout(() => setPopupVisible(false), 160);
+  };
+  const popupBackdropStyle = useAnimatedStyle(() => ({ opacity: popupProgress.value }));
+  const popupCardStyle = useAnimatedStyle(() => ({
+    opacity: popupProgress.value,
+    transform: [
+      { translateY: (1 - popupProgress.value) * 22 },
+      { scale: 0.97 + popupProgress.value * 0.03 },
+    ],
+  }));
 
   const confirmDelete = (entry: FeelingEntry) => {
     Alert.alert(t('history.deleteTitle'), t('history.deleteMessage'), [
@@ -389,10 +416,7 @@ export function HomeScreen() {
                 <Pressable
                   key={item.id}
                   style={({ pressed }) => [styles.statBox, pressed && styles.pressedCard]}
-                  onPress={() => {
-                    haptics.selection();
-                    setDetail(item.id);
-                  }}
+                  onPress={() => openDetail(item.id)}
                 >
                   <Text style={[styles.statLabel, { fontFamily: font(lang, 'semibold') }]}>
                     {item.label}
@@ -599,17 +623,14 @@ export function HomeScreen() {
 
       {/* Stat detail popup */}
       <Modal
-        visible={detail != null}
+        visible={popupVisible}
         transparent
-        animationType="fade"
-        onRequestClose={() => setDetail(null)}
+        animationType="none"
+        onRequestClose={closeDetail}
       >
-        <Pressable style={styles.popupBackdrop} onPress={() => setDetail(null)}>
-          <Animated.View
-            key={detail}
-            entering={ZoomIn.duration(200).springify().damping(18)}
-            style={styles.popupCard}
-          >
+        <Animated.View style={[styles.popupBackdrop, popupBackdropStyle]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeDetail} />
+          <Animated.View style={[styles.popupCard, popupCardStyle]}>
             <Pressable onPress={() => {}}>
               <View style={styles.popupHeader}>
                 <Text style={[styles.popupTitle, { fontFamily: displayFont(lang) }]}>
@@ -619,7 +640,7 @@ export function HomeScreen() {
                       ? t('home.statStreak')
                       : t('home.statTotal')}
                 </Text>
-                <Pressy hitSlop={10} scaleTo={0.85} onPress={() => setDetail(null)}>
+                <Pressy hitSlop={10} scaleTo={0.85} onPress={closeDetail}>
                   <Ionicons name="close" size={22} color={theme.colors.inkSoft} />
                 </Pressy>
               </View>
@@ -716,8 +737,7 @@ export function HomeScreen() {
                   <Pressable
                     style={styles.detailMoreBtn}
                     onPress={() => {
-                      haptics.selection();
-                      setDetail(null);
+                      closeDetail();
                       goToTab('stats');
                     }}
                   >
@@ -735,7 +755,7 @@ export function HomeScreen() {
               ) : null}
             </Pressable>
           </Animated.View>
-        </Pressable>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
